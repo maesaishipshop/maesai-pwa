@@ -332,7 +332,7 @@ export default function AdminComplaintsPage({ onNavigate }) {
 
   useEffect(() => {
     fetchComplaints(filterTab, page);
-  }, [filterTab, page]);
+  }, [filterTab, page, fetchComplaints]);
 
   function handleTabChange(key) {
     setFilterTab(key);

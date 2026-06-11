@@ -23,28 +23,6 @@ import buyerApi,  { clearToken as clearBuyer,  setToken as setBuyerApiToken  } f
 import driverApi, { clearToken as clearDriver, setToken as setDriverApiToken  } from './api/driver.api';
 import adminApi,  { clearToken as clearAdmin,  setToken as setAdminApiToken   } from './api/admin.api';
 
-/* ── Full-page Loading ───────────────────────────── */
-function FullPageLoading() {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: 'var(--color-bg)',
-        flexDirection: 'column',
-        gap: 12,
-      }}
-    >
-      <div style={{ fontSize: 32 }}>🌿</div>
-      <p style={{ color: 'var(--color-text-hint)', fontSize: 14, fontFamily: 'var(--font-main)' }}>
-        Maesai Market
-      </p>
-    </div>
-  );
-}
-
 /* ComingSoon ลบออกแล้ว — ทุก role มี App component ครบแล้ว (Step 15-6) */
 
 /* ── App ──────────────────────────────────────────── */
