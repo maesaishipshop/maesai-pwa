@@ -1,0 +1,715 @@
+// src/pages/seller/SellerChatPage.jsx
+// Seller Chat — แชทกับ Buyer + Admin
+// Room types: seller_buyer, seller_admin
+// Features: image preview, long-press edit/delete, badge on startup,
+//           timestamp under bubble, seen indicator (✓/✓✓)
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import sellerApi from '../../api/seller.api';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+
+function toImgUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${BACKEND_URL}${p}`;
+}
+
+/* ── helper: format timestamp ───────────────────────── */
+function formatTime(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+}
+
+/* ── Room List ───────────────────────────────────── */
+function RoomList({ rooms, onSelect, loading }) {
+  const { t } = useTranslation();
+
+  if (loading) {
+    return <div className="loading-center">⏳ {t('common.loading')}…</div>;
+  }
+  if (rooms.length === 0) {
+    return (
+      <div className="empty-state" style={{ paddingTop: 60 }}>
+        <div className="empty-state-icon">💬</div>
+        <div>ยังไม่มีการสนทนา</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-hint)', marginTop: 6 }}>
+          ข้อความจากลูกค้าจะปรากฏที่นี่
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {rooms.map((room) => {
+        const isAdmin        = room.room_type?.includes('admin');
+        const isDriverSeller = room.room_type === 'driver_seller';
+        const name           = isAdmin
+          ? 'Admin Support'
+          : isDriverSeller
+            ? (room.driver_name || 'คนขับ')
+            : (room.buyer_name || room.other_name || room.name || 'ลูกค้า');
+        const avatar   = isAdmin || isDriverSeller ? null : toImgUrl(room.buyer_avatar || room.other_avatar);
+        const lastMsg  = room.last_message || '';
+        const unread   = room.unread_seller || room.unread_count || 0;
+
+        return (
+          <div
+            key={room.id}
+            onClick={() => onSelect(room)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '14px 16px',
+              borderBottom: '0.5px solid var(--color-border)',
+              cursor: 'pointer', background: 'white',
+            }}
+          >
+            {/* Avatar */}
+            <div style={{
+              width: 44, height: 44, borderRadius: '50%', overflow: 'hidden',
+              background: isAdmin ? '#e8eaf6' : isDriverSeller ? '#ede9fe' : 'var(--color-primary-light)',
+              flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20,
+            }}>
+              {avatar
+                ? <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                : isAdmin ? '👨‍💼' : isDriverSeller ? '🚗' : '🛍️'}
+            </div>
+
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-main)' }}>{name}</span>
+                  {isDriverSeller && (
+                    <span style={{
+                      fontSize: 10, color: '#7c3aed',
+                      background: '#ede9fe', borderRadius: 4,
+                      padding: '1px 5px', fontWeight: 600, flexShrink: 0,
+                    }}>🚗 ขนส่ง</span>
+                  )}
+                </div>
+                {room.last_message_at && (
+                  <span style={{ fontSize: 11, color: 'var(--color-text-hint)' }}>
+                    {formatTime(room.last_message_at)}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{
+                  fontSize: 12, color: 'var(--color-text-hint)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  maxWidth: '80%',
+                }}>
+                  {lastMsg || 'เริ่มการสนทนา...'}
+                </span>
+                {unread > 0 && (
+                  <span style={{
+                    background: 'var(--color-primary)', color: 'white',
+                    borderRadius: '50%', minWidth: 18, height: 18,
+                    fontSize: 11, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 4px', flexShrink: 0,
+                  }}>
+                    {unread > 9 ? '9+' : unread}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Chat Window ─────────────────────────────────── */
+function ChatWindow({ room, sellerProfile, socket, onBack }) {
+  const { t } = useTranslation();
+  const [messages, setMessages]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [text, setText]             = useState('');
+  const [sending, setSending]       = useState(false);
+  // Image preview before send
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile]       = useState(null);
+  // Long-press popup
+  const [pressedMsgId, setPressedMsgId] = useState(null);
+  const pressTimerRef                   = useRef(null);
+  // Edit mode
+  const [editingMsg, setEditingMsg] = useState(null);
+
+  // ── Seen indicator ──
+  // otherType: ฝ่ายตรงข้ามในห้องนี้
+  const isAdmin        = room.room_type?.includes('admin');
+  const isDriverSeller = room.room_type === 'driver_seller';
+  const otherType      = isAdmin ? 'admin' : isDriverSeller ? 'driver' : 'buyer';
+  // seenByOther: true ถ้าอีกฝ่ายอ่านแล้ว (unread ของเขา = 0)
+  const initUnread = isAdmin
+    ? (room.unread_admin  || 0)
+    : isDriverSeller
+      ? (room.unread_driver || 0)
+      : (room.unread_buyer  || 0);
+  const [seenByOther, setSeenByOther] = useState(initUnread === 0);
+
+  const roomName = isAdmin
+    ? 'Admin Support'
+    : isDriverSeller
+      ? (room.driver_name || 'คนขับ')
+      : (room.buyer_name || room.other_name || room.name || 'ลูกค้า');
+
+  const bottomRef    = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const loadMessages = useCallback(async () => {
+    try {
+      const res = await sellerApi.get(`/chat/rooms/${room.id}/messages`, { params: { limit: 50 } });
+      const msgs = res.data.messages || res.data.data || res.data || [];
+      // Bug fix: API คืนผล old→new แล้ว ไม่ต้อง reverse ซ้ำ
+      setMessages(Array.isArray(msgs) ? msgs : []);
+    } catch {
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [room.id]);
+
+  useEffect(() => {
+    loadMessages();
+    sellerApi.post(`/chat/rooms/${room.id}/read`).catch(() => {});
+  }, [room.id, loadMessages]);
+
+  // Socket: join + listen
+  useEffect(() => {
+    if (!socket) return;
+    socket.emit('join_room', { roomId: room.id }); // Bug fix: camelCase
+
+    function onNewMsg(msg) {
+      if (msg.room_id === room.id || msg.chat_room_id === room.id) {
+        setMessages((prev) => {
+          if (prev.find((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      }
+    }
+    function onMsgEdited(updatedMsg) {
+      if (updatedMsg.room_id === room.id) {
+        setMessages((prev) => prev.map((m) => m.id === updatedMsg.id ? updatedMsg : m));
+      }
+    }
+    function onMsgDeleted({ id, room_id }) {
+      if (room_id === room.id) {
+        setMessages((prev) => prev.filter((m) => m.id !== id));
+      }
+    }
+    // Seen indicator: อีกฝ่ายอ่านข้อความแล้ว → ✓✓
+    function onMessagesRead({ roomId, readerType }) {
+      if (roomId === room.id && readerType === otherType) {
+        setSeenByOther(true);
+      }
+    }
+
+    socket.on('receive_message', onNewMsg);
+    socket.on('message_edited',  onMsgEdited);
+    socket.on('message_deleted', onMsgDeleted);
+    socket.on('messages_read',   onMessagesRead);
+    return () => {
+      socket.off('receive_message', onNewMsg);
+      socket.off('message_edited',  onMsgEdited);
+      socket.off('message_deleted', onMsgDeleted);
+      socket.off('messages_read',   onMessagesRead);
+    };
+  }, [socket, room.id, otherType]);
+
+  // Scroll to bottom
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // ── Long press handlers ──
+  function handlePressStart(msgId) {
+    clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => setPressedMsgId(msgId), 600);
+  }
+  function handlePressEnd() {
+    clearTimeout(pressTimerRef.current);
+  }
+
+  // ── Select image (preview only) ──
+  function handleImageSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview(ev.target.result);
+    reader.readAsDataURL(file);
+    setImageFile(file);
+    e.target.value = '';
+  }
+
+  function cancelImage() {
+    setImageFile(null);
+    setImagePreview(null);
+  }
+
+  // ── Send ──
+  async function handleSend() {
+    if (sending) return;
+
+    // Mode 1: แก้ไขข้อความ (ไม่ reset seen — ไม่ใช่ข้อความใหม่)
+    if (editingMsg) {
+      const newText = text.trim();
+      if (!newText) return;
+      setSending(true);
+      try {
+        const res = await sellerApi.put(`/chat/rooms/${room.id}/messages/${editingMsg.id}`, { message: newText });
+        const updated = res.data.data || { ...editingMsg, message: newText, edited_at: new Date().toISOString() };
+        setMessages((prev) => prev.map((m) => m.id === editingMsg.id ? updated : m));
+        setEditingMsg(null);
+        setText('');
+      } catch { /* silent */ }
+      finally { setSending(false); }
+      return;
+    }
+
+    // Mode 2: ส่งรูปภาพ (ข้อความใหม่ → reset seen)
+    if (imageFile) {
+      setSending(true);
+      try {
+        const form = new FormData();
+        form.append('image', imageFile);
+        await sellerApi.post(`/chat/rooms/${room.id}/messages`, form, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setImageFile(null);
+        setImagePreview(null);
+        setSeenByOther(false);
+        loadMessages();
+      } catch { /* silent */ }
+      finally { setSending(false); }
+      return;
+    }
+
+    // Mode 3: ส่งข้อความ (ข้อความใหม่ → reset seen)
+    const txt = text.trim();
+    if (!txt) return;
+    setSending(true);
+    try {
+      await sellerApi.post(`/chat/rooms/${room.id}/messages`, { message: txt });
+      setText('');
+      setSeenByOther(false);
+      loadMessages();
+    } catch { /* silent */ }
+    finally { setSending(false); }
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  }
+
+  // ── Delete message ──
+  async function handleDeleteMsg(msgId) {
+    setPressedMsgId(null);
+    try {
+      await sellerApi.delete(`/chat/rooms/${room.id}/messages/${msgId}`);
+      setMessages((prev) => prev.filter((m) => m.id !== msgId));
+    } catch { /* silent */ }
+  }
+
+  const myId = sellerProfile?.id;
+  const hasExtra = imagePreview || editingMsg;
+
+  // หา id ของข้อความล่าสุดที่ฉัน (seller) ส่ง — ใช้แสดง seen indicator
+  let lastSentMsgId = null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].sender_type === 'seller') { lastSentMsgId = messages[i].id; break; }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      {/* Top bar */}
+      <div className="top-bar">
+        <button className="top-bar-back" onClick={onBack}>‹</button>
+        <span className="top-bar-title" style={{ fontSize: 14 }}>{roomName}</span>
+        <div style={{ width: 32 }} />
+      </div>
+
+      {/* Overlay */}
+      {pressedMsgId && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 199 }}
+          onClick={() => setPressedMsgId(null)}
+        />
+      )}
+
+      {/* Messages */}
+      <div style={{
+        flex: 1, overflowY: 'auto',
+        padding: '12px 16px',
+        paddingBottom: hasExtra ? 220 : 148,
+        background: 'var(--color-bg)',
+        display: 'flex', flexDirection: 'column', gap: 4,
+      }}>
+        {loading ? (
+          <div className="loading-center">⏳ {t('common.loading')}…</div>
+        ) : messages.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--color-text-hint)', fontSize: 13, marginTop: 40 }}>
+            เริ่มบทสนทนา!
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isMine  = msg.sender_id === myId || msg.sender_type === 'seller';
+            const isImg   = msg.message_type === 'image' || !!msg.image_path;
+            const imgSrc  = toImgUrl(msg.image_path);
+            const isLastSent = isMine && msg.id === lastSentMsgId;
+
+            return (
+              // Outer wrapper: column layout → bubble แล้วตามด้วย timestamp row
+              <div
+                key={msg.id}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: isMine ? 'flex-end' : 'flex-start',
+                }}
+              >
+                {/* ── Bubble ── */}
+                <div
+                  onMouseDown={isMine ? () => handlePressStart(msg.id) : undefined}
+                  onMouseUp={isMine ? handlePressEnd : undefined}
+                  onMouseLeave={isMine ? handlePressEnd : undefined}
+                  onTouchStart={isMine ? () => handlePressStart(msg.id) : undefined}
+                  onTouchEnd={isMine ? handlePressEnd : undefined}
+                  style={{
+                    maxWidth: '72%',
+                    background: isMine ? 'var(--color-primary)' : 'white',
+                    color: isMine ? 'white' : 'var(--color-text-main)',
+                    borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                    padding: isImg ? 4 : '8px 12px',
+                    fontSize: 13,
+                    boxShadow: 'var(--shadow-sm)',
+                    position: 'relative',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    cursor: isMine ? 'pointer' : 'default',
+                  }}
+                >
+                  {/* Content */}
+                  {isImg ? (
+                    imgSrc ? (
+                      <img
+                        src={imgSrc} alt="รูปภาพ"
+                        style={{ maxWidth: 200, borderRadius: 12, display: 'block' }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentNode.querySelector('.img-fallback').style.display = 'block';
+                        }}
+                      />
+                    ) : null
+                  ) : msg.message}
+                  {isImg && (
+                    <span className="img-fallback" style={{
+                      display: 'none', padding: '6px 10px', fontSize: 13,
+                      color: isMine ? 'rgba(255,255,255,0.85)' : 'var(--color-text-hint)',
+                    }}>📷 รูปภาพ</span>
+                  )}
+
+                  {/* แก้ไขแล้ว label (อยู่ใน bubble) */}
+                  {msg.edited_at && (
+                    <div style={{
+                      fontSize: 10, marginTop: 2, fontStyle: 'italic',
+                      color: isMine ? 'rgba(255,255,255,0.65)' : '#aaa',
+                      textAlign: 'right',
+                    }}>
+                      แก้ไขแล้ว
+                    </div>
+                  )}
+
+                  {/* Long-press popup */}
+                  {pressedMsgId === msg.id && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      right: isMine ? 0 : 'auto',
+                      left: isMine ? 'auto' : 0,
+                      background: 'white',
+                      borderRadius: 12,
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+                      overflow: 'hidden',
+                      zIndex: 200,
+                      minWidth: 140,
+                      marginBottom: 6,
+                    }}>
+                      {!isImg && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingMsg(msg);
+                            setText(msg.message || '');
+                            setPressedMsgId(null);
+                          }}
+                          style={{
+                            display: 'block', width: '100%',
+                            padding: '12px 16px',
+                            border: 'none', borderBottom: '0.5px solid var(--color-border)',
+                            background: 'none', textAlign: 'left',
+                            fontSize: 14, cursor: 'pointer', color: 'var(--color-text-main)',
+                          }}
+                        >
+                          ✏️ แก้ไข
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteMsg(msg.id);
+                        }}
+                        style={{
+                          display: 'block', width: '100%',
+                          padding: '12px 16px',
+                          border: 'none', background: 'none',
+                          textAlign: 'left', fontSize: 14,
+                          color: 'var(--color-danger)', cursor: 'pointer',
+                        }}
+                      >
+                        🗑️ ลบ
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── ใต้ bubble: timestamp + seen indicator ── */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  marginTop: 2,
+                  fontSize: 11,
+                  color: '#999',
+                }}>
+                  <span>{formatTime(msg.created_at)}</span>
+                  {/* Seen indicator แสดงเฉพาะข้อความล่าสุดที่ฉันส่ง */}
+                  {isLastSent && (
+                    <span style={{
+                      color: seenByOther ? '#2D9B6E' : '#aaa',
+                      fontWeight: seenByOther ? 700 : 400,
+                      fontSize: 11,
+                    }}>
+                      {seenByOther ? '✓✓' : '✓'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleImageSelect}
+      />
+
+      {/* Bottom input area */}
+      <div style={{
+        position: 'fixed',
+        bottom: 64,
+        left: 0, right: 0,
+        maxWidth: 480,
+        margin: '0 auto',
+        background: 'white',
+        borderTop: '0.5px solid var(--color-border)',
+        zIndex: 100,
+      }}>
+        {/* Edit banner */}
+        {editingMsg && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 12px',
+            background: '#fff8e1',
+            borderBottom: '0.5px solid var(--color-border)',
+            fontSize: 12, color: '#795548',
+          }}>
+            <span style={{ flex: 1 }}>✏️ กำลังแก้ไขข้อความ</span>
+            <button
+              onClick={() => { setEditingMsg(null); setText(''); }}
+              style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-hint)', lineHeight: 1 }}
+            >✕</button>
+          </div>
+        )}
+
+        {/* Image preview bar */}
+        {imagePreview && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '8px 12px',
+            background: '#f5f5f5',
+            borderBottom: '0.5px solid var(--color-border)',
+          }}>
+            <img src={imagePreview} alt="preview" style={{ height: 56, width: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 12, color: 'var(--color-text-hint)' }}>รูปภาพที่เลือก — กด ➤ เพื่อส่ง</span>
+            <button
+              onClick={cancelImage}
+              style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-hint)', lineHeight: 1 }}
+            >✕</button>
+          </div>
+        )}
+
+        {/* Input row */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: '10px 12px' }}>
+          {!imagePreview && !editingMsg && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending}
+              style={{
+                width: 38, height: 38, borderRadius: '50%',
+                border: '1px solid var(--color-border)',
+                background: 'white', fontSize: 18,
+                cursor: 'pointer', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              📷
+            </button>
+          )}
+
+          <textarea
+            placeholder={editingMsg ? 'แก้ไขข้อความ...' : 'พิมพ์ข้อความ...'}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKey}
+            rows={1}
+            disabled={!!imagePreview}
+            style={{
+              flex: 1, padding: '8px 12px',
+              border: '1px solid var(--color-border)',
+              borderRadius: 20, fontSize: 14,
+              fontFamily: 'var(--font-main)', resize: 'none', outline: 'none',
+              maxHeight: 100, overflowY: 'auto',
+              background: imagePreview ? '#f5f5f5' : 'white',
+            }}
+          />
+
+          <button
+            onClick={handleSend}
+            disabled={sending || (!text.trim() && !imageFile)}
+            style={{
+              width: 38, height: 38, borderRadius: '50%',
+              border: 'none', background: editingMsg ? '#ff9800' : 'var(--color-primary)', color: 'white',
+              fontSize: 16, cursor: 'pointer',
+              opacity: (sending || (!text.trim() && !imageFile)) ? 0.5 : 1,
+              flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {editingMsg ? '✓' : '➤'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main SellerChatPage ─────────────────────────── */
+export default function SellerChatPage({ socket, onUnreadChange }) {
+  const { t } = useTranslation();
+  const [rooms, setRooms]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [activeRoom, setActive] = useState(null);
+  const [profile, setProfile]   = useState(null);
+
+  // Load seller profile
+  useEffect(() => {
+    sellerApi.get('/sellers/profile')
+      .then((r) => setProfile(r.data.data || r.data.seller || r.data))
+      .catch(() => {});
+  }, []);
+
+  // Load room list
+  const loadRooms = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await sellerApi.get('/chat/rooms');
+      const list = res.data.rooms || res.data.data || res.data || [];
+      setRooms(Array.isArray(list) ? list : []);
+      const totalUnread = list.reduce((sum, r) => sum + (r.unread_seller || r.unread_count || 0), 0);
+      if (onUnreadChange) onUnreadChange(totalUnread);
+    } catch {
+      setRooms([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [onUnreadChange]);
+
+  useEffect(() => { loadRooms(); }, [loadRooms]);
+
+  /* ── Contact Admin — สร้างหรือเปิดห้อง seller_admin ── */
+  async function handleContactAdmin() {
+    try {
+      const r = await sellerApi.post('/chat/rooms', { type: 'seller_admin' });
+      const room = r.data.room || r.data.data || r.data;
+      if (room?.id) { setActive(room); loadRooms(); }
+    } catch { /* silent */ }
+  }
+
+  if (activeRoom) {
+    return (
+      <ChatWindow
+        room={activeRoom}
+        sellerProfile={profile}
+        socket={socket}
+        onBack={() => { setActive(null); loadRooms(); }}
+      />
+    );
+  }
+
+  return (
+    <div style={{ paddingBottom: 80 }}>
+      <div className="top-bar">
+        <span className="top-bar-title">💬 {t('nav.chat') || 'แชท'}</span>
+        <button
+          onClick={loadRooms}
+          style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer' }}
+        >
+          🔄
+        </button>
+      </div>
+
+      {/* ปุ่มติดต่อ Admin — แสดงเสมอบนสุดของ chat list */}
+      <div style={{ padding: '12px 16px 4px' }}>
+        <button
+          onClick={handleContactAdmin}
+          style={{
+            background: '#e8eaf6', color: '#3949ab',
+            border: '1px solid #c5cae9', borderRadius: 12,
+            padding: '10px 16px', marginBottom: 4,
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 14, width: '100%', cursor: 'pointer',
+            fontFamily: 'var(--font-main)',
+          }}
+        >
+          <span style={{ fontSize: 18 }}>👨‍💼</span>
+          <span style={{ fontWeight: 600 }}>ติดต่อผู้ดูแลระบบ</span>
+        </button>
+      </div>
+
+      <RoomList
+        rooms={rooms}
+        loading={loading}
+        onSelect={(room) => {
+          setActive(room);
+          setRooms((prev) => prev.map((r) => r.id === room.id
+            ? { ...r, unread_seller: 0, unread_count: 0 } : r));
+        }}
+      />
+    </div>
+  );
+}

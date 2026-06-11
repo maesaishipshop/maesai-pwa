@@ -1,0 +1,9 @@
+{
+  "short_name": "Maesai Market",
+  "name": "Maesai Market — B2B Wholesale",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2D9B6E",
+  "background_color": "#F7FAF9"
+}

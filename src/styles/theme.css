@@ -1,0 +1,321 @@
+/* ============================================================
+   Maesai Market — Design System (สีมรกต)
+   Step 15: Frontend PWA
+   ============================================================ */
+
+/* ── Horizontal scroll rows (category chips, status tabs) ── */
+/* ซ่อน scrollbar บน Chrome/Safari/iOS — ใช้ร่วมกับ
+   overflowX: 'auto' และ WebkitOverflowScrolling: 'touch' ใน inline style */
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+:root {
+  --color-primary:       #2D9B6E;
+  --color-primary-light: #E1F5EE;
+  --color-primary-mid:   #5DCAA5;
+  --color-primary-dark:  #085041;
+  --color-primary-deeper:#04342C;
+  --color-white:         #ffffff;
+  --color-bg:            #F7FAF9;
+  --color-bg-card:       #ffffff;
+  --color-text-main:     #1a1a1a;
+  --color-text-sub:      #6b7280;
+  --color-text-hint:     #9ca3af;
+  --color-border:        #e5e7eb;
+  --color-border-light:  #f0f0f0;
+  --color-success:       #2D9B6E;
+  --color-warning:       #F59E0B;
+  --color-danger:        #EF4444;
+  --color-info:          #3B82F6;
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.10);
+  --font-main:  'Prompt', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* iOS global fixes */
+/* ลบ tap highlight สีเทาบน iOS ที่ทำให้ดูเหมือนปุ่มไม่ตอบสนอง */
+* { -webkit-tap-highlight-color: transparent; }
+/* ป้องกัน iOS callout menu (copy/paste) ปรากฏบน input label */
+label { -webkit-touch-callout: none; }
+
+/* PWA native feel: ป้องกัน text cursor และ text selection บน non-input elements */
+/* แก้ bug I-beam cursor ปรากฏเมื่อกดทุกที่ในหน้า */
+/* cursor: default ป้องกัน browser แสดง I-beam อัตโนมัติบน text content */
+* {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  cursor: default;
+}
+/* Re-enable text selection และ cursor เฉพาะ input elements */
+input, textarea, select, [contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  cursor: auto;
+}
+/* Restore pointer cursor สำหรับ clickable elements */
+button, a, [role="button"] {
+  cursor: pointer;
+}
+
+body { font-family: var(--font-main); background: var(--color-bg); color: var(--color-text-main); }
+
+/* ── Buttons ─────────────────────────────────────────── */
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 500;
+  font-family: var(--font-main);
+  cursor: pointer;
+  width: 100%;
+  transition: opacity 0.15s;
+}
+.btn-primary:active { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 500;
+  font-family: var(--font-main);
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s;
+}
+.btn-secondary:active { background: var(--color-primary-light); }
+
+.btn-danger {
+  background: var(--color-danger);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 500;
+  font-family: var(--font-main);
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-sub);
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-family: var(--font-main);
+  cursor: pointer;
+}
+
+/* ── Card ────────────────────────────────────────────── */
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 0.5px solid var(--color-border);
+  padding: 16px;
+}
+.card + .card { margin-top: 12px; }
+
+/* ── Badges ──────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.badge-success { background: var(--color-primary-light); color: var(--color-primary-dark); }
+.badge-warning { background: #FEF3C7; color: #92400E; }
+.badge-danger  { background: #FEE2E2; color: #991B1B; }
+.badge-info    { background: #EFF6FF; color: #1E40AF; }
+.badge-gray    { background: #F3F4F6; color: #374151; }
+
+/* ── Form ────────────────────────────────────────────── */
+.input-field {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  /* iOS fix #1: font ≥ 16px ป้องกัน auto-zoom เมื่อ focus บน Safari/iOS */
+  font-size: 16px;
+  font-family: var(--font-main);
+  background: white;
+  outline: none;
+  transition: border-color 0.15s;
+  /* iOS fix #2: ลบ native iOS input styling ที่อาจ clip tap area */
+  -webkit-appearance: none;
+  appearance: none;
+  /* iOS fix #3: ลด 300ms double-tap delay */
+  touch-action: manipulation;
+  /* iOS fix #4: ป้องกัน tap area ถูก parent overlay บัง */
+  position: relative;
+  z-index: 1;
+}
+.input-field:focus { border-color: var(--color-primary); outline: none; }
+.input-field::placeholder { color: var(--color-text-hint); }
+
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-sub);
+  margin-bottom: 6px;
+}
+.form-error {
+  font-size: 12px;
+  color: var(--color-danger);
+  margin-top: 4px;
+}
+
+/* ── Layout ──────────────────────────────────────────── */
+.page-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--color-bg);
+  position: relative;
+}
+
+/* ── Top Bar ─────────────────────────────────────────── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: white;
+  border-bottom: 0.5px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.top-bar-title {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--color-text-main);
+}
+.top-bar-back {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--color-primary);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Bottom Navigation ───────────────────────────────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  background: white;
+  border-top: 0.5px solid var(--color-border);
+  display: flex;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0 8px;
+  font-size: 11px;
+  color: var(--color-text-hint);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font-main);
+  transition: color 0.15s;
+}
+.bottom-nav-item.active { color: var(--color-primary); }
+.bottom-nav-icon { font-size: 22px; margin-bottom: 2px; }
+
+/* ── Content ─────────────────────────────────────────── */
+.content-area {
+  padding: 16px;
+  padding-bottom: 80px;
+}
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+/* ── Loading / Error ─────────────────────────────────── */
+.loading-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--color-text-hint);
+  font-size: 14px;
+  gap: 8px;
+}
+.error-box {
+  background: #FEE2E2;
+  color: #991B1B;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 14px;
+  margin: 8px 0;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  color: var(--color-text-hint);
+  font-size: 14px;
+  text-align: center;
+  gap: 8px;
+}
+.empty-state-icon { font-size: 40px; margin-bottom: 4px; }
+
+/* ── Divider ─────────────────────────────────────────── */
+.divider {
+  height: 0.5px;
+  background: var(--color-border);
+  margin: 12px 0;
+}
+
+/* ── Toast / Alert ───────────────────────────────────── */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 9999;
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+}

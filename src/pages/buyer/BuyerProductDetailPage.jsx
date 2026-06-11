@@ -1,0 +1,513 @@
+// src/pages/buyer/BuyerProductDetailPage.jsx
+// รายละเอียดสินค้า — รูปหลายรูป, info seller, qty (MOQ), place order
+
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import buyerApi from '../../api/buyer.api';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+
+function toImgUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return `${BACKEND_URL}${path}`;
+}
+
+/**
+ * getVideoThumbnail(videoUrl)
+ * Generate thumbnail จาก frame 0.5 วินาทีแรกของวิดีโอ
+ * ใช้ canvas API — ทำงานได้ทั้ง mp4 และ mov (iOS Safari รองรับ)
+ * Return: data URL (image/jpeg) หรือ null ถ้า error
+ */
+function getVideoThumbnail(videoUrl) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.preload = 'metadata';
+    video.src = videoUrl;
+    video.currentTime = 0.5; // seek ไป 0.5 วินาที
+    video.addEventListener('seeked', () => {
+      const canvas = document.createElement('canvas');
+      canvas.width  = video.videoWidth  || 320;
+      canvas.height = video.videoHeight || 240;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+      video.remove();
+    }, { once: true });
+    video.addEventListener('error', () => resolve(null), { once: true });
+  });
+}
+
+/* ── Image gallery ───────────────────────────────── */
+function ImageGallery({ images }) {
+  const [idx, setIdx] = useState(0);
+  if (!images || images.length === 0) {
+    return (
+      <div
+        style={{
+          height: 240, background: 'var(--color-bg)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 56, color: 'var(--color-text-hint)',
+        }}
+      >
+        📦
+      </div>
+    );
+  }
+  const current = images[idx];
+  const url = toImgUrl(current?.image_path || current);
+
+  return (
+    <div>
+      <div
+        style={{
+          height: 240, background: '#000',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden',
+        }}
+      >
+        <img
+          src={url}
+          alt="product"
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
+      </div>
+      {images.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, padding: '8px 16px', overflowX: 'auto' }}>
+          {images.map((img, i) => {
+            const thumbUrl = toImgUrl(img?.image_path || img);
+            return (
+              <div
+                key={i}
+                onClick={() => setIdx(i)}
+                style={{
+                  width: 52, height: 52, flexShrink: 0,
+                  borderRadius: 8, overflow: 'hidden',
+                  border: i === idx ? '2px solid var(--color-primary)' : '2px solid transparent',
+                  cursor: 'pointer', background: 'var(--color-bg)',
+                }}
+              >
+                <img
+                  src={thumbUrl}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Info row ────────────────────────────────────── */
+function InfoRow({ label, value }) {
+  if (!value) return null;
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '0.5px solid var(--color-border)' }}>
+      <span style={{ fontSize: 13, color: 'var(--color-text-sub)' }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-main)' }}>{value}</span>
+    </div>
+  );
+}
+
+/* ── Main ────────────────────────────────────────── */
+export default function BuyerProductDetailPage({ productId, onBack, onOrderPlaced, onChatSeller, onOpenChatRoom, onNavigate }) {
+  const { t } = useTranslation();
+  const [product, setProduct]         = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [qty, setQty]                 = useState(1);
+  const [ordering, setOrdering]       = useState(false);
+  const [chatLoading, setChatLoading] = useState(false); // loading state สำหรับปุ่มแชท
+  const [error, setError]             = useState('');
+  const [showOrder, setShowOrder]     = useState(false);
+  const [note, setNote]               = useState('');
+  const [addressRequired, setAddressRequired] = useState(false); // banner ยังไม่มีที่อยู่
+  const [videoPoster, setVideoPoster] = useState(null); // thumbnail ของวิดีโอ
+
+  /* ── Load product ────────────────────────────── */
+  useEffect(() => {
+    setLoading(true);
+    buyerApi.get(`/products/${productId}`)
+      .then((r) => {
+        const p = r.data.product || r.data.data || r.data;
+        setProduct(p);
+        setQty(p.moq || 1);
+      })
+      .catch(() => setProduct(null))
+      .finally(() => setLoading(false));
+  }, [productId]);
+
+  /* ── Generate video thumbnail เมื่อมี video_path ── */
+  useEffect(() => {
+    if (!product?.video_path) { setVideoPoster(null); return; }
+    const videoUrl = toImgUrl(product.video_path);
+    getVideoThumbnail(videoUrl).then(setVideoPoster);
+  }, [product?.video_path]);
+
+  /* ── Place order ─────────────────────────────── */
+  async function handleOrder() {
+    if (!product) return;
+    const moq   = Number(product.moq || 1);
+    const stock = Number(product.stock || 0);
+    if (qty < moq) {
+      setError(t('buyer.qty_below_moq').replace('{{moq}}', moq).replace('{{unit}}', product.unit || ''));
+      return;
+    }
+    if (stock > 0 && qty > stock) {
+      setError(t('buyer.qty_over_stock'));
+      return;
+    }
+    setError('');
+    setOrdering(true);
+    const payload = {
+      seller_id: product.seller_id,
+      items: [{ product_id: product.id, quantity: qty }],
+      note: note.trim() || undefined,
+    };
+    try {
+      const res = await buyerApi.post('/orders', payload);
+      const orderId = res.data.order?.id || res.data.data?.id || res.data.id;
+      setShowOrder(false);
+      if (onOrderPlaced) onOrderPlaced(orderId);
+    } catch (err) {
+      const errorCode = err.response?.data?.error || err.response?.data?.message;
+      if (errorCode === 'DELIVERY_ADDRESS_REQUIRED') {
+        setAddressRequired(true); // แสดง inline banner แทน error text
+        setError('');
+      } else {
+        setAddressRequired(false);
+        setError(err.response?.data?.message || 'สั่งซื้อไม่สำเร็จ');
+      }
+    } finally {
+      setOrdering(false);
+    }
+  }
+
+  /* ── Loading ─────────────────────────────────── */
+  if (loading) {
+    return (
+      <div className="page-container">
+        <div className="top-bar">
+          <button className="top-bar-back" onClick={onBack}>‹</button>
+          <span className="top-bar-title">{t('common.loading')}…</span>
+          <div style={{ width: 32 }} />
+        </div>
+        <div className="loading-center">⏳ {t('common.loading')}…</div>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="page-container">
+        <div className="top-bar">
+          <button className="top-bar-back" onClick={onBack}>‹</button>
+          <span className="top-bar-title">—</span>
+          <div style={{ width: 32 }} />
+        </div>
+        <div className="empty-state">
+          <div className="empty-state-icon">❌</div>
+          <div>{t('common.error')}</div>
+          <button className="btn-secondary" style={{ marginTop: 16, width: 'auto', padding: '10px 24px' }} onClick={onBack}>
+            {t('common.back')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const name  = product.name_th || product.name_en || product.name_my || '—';
+  const stock = Number(product.stock || 0);
+  const moq   = Number(product.moq || 1);
+
+  return (
+    <div style={{ paddingBottom: 100 }}>
+      {/* Top bar */}
+      <div className="top-bar">
+        <button className="top-bar-back" onClick={onBack}>‹</button>
+        <span className="top-bar-title" style={{ fontSize: 14 }}>{name}</span>
+        <div style={{ width: 32 }} />
+      </div>
+
+      {/* Images */}
+      <ImageGallery images={product.images || []} />
+
+      {/* Video แนะนำสินค้า — แสดงเฉพาะเมื่อมี video_path */}
+      {product.video_path && (
+        <div style={{ padding: '12px 16px 0' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-main)', marginBottom: 8 }}>
+            🎬 วิดีโอแนะนำสินค้า
+          </div>
+          <video
+            src={toImgUrl(product.video_path)}
+            poster={videoPoster || undefined}
+            controls
+            playsInline
+            preload="metadata"
+            style={{
+              width: '100%',
+              maxHeight: 260,
+              borderRadius: 'var(--radius-md)',
+              background: '#000',
+              display: 'block',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Main info */}
+      <div style={{ padding: '16px 16px 0' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-main)', marginBottom: 4 }}>
+          {name}
+        </div>
+
+        {/* Category + stock badge */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          {product.category_name && (
+            <span style={{ fontSize: 11, background: 'var(--color-primary-light)', color: 'var(--color-primary-dark)', borderRadius: 10, padding: '2px 8px' }}>
+              {product.category_name}
+            </span>
+          )}
+          {stock === 0 ? (
+            <span style={{ fontSize: 11, background: '#fdecea', color: 'var(--color-danger)', borderRadius: 10, padding: '2px 8px', fontWeight: 600 }}>
+              {t('product.out_of_stock')}
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, background: '#e8f5ef', color: 'var(--color-primary)', borderRadius: 10, padding: '2px 8px' }}>
+              {t('buyer.stock')}: {stock} {product.unit}
+            </span>
+          )}
+        </div>
+
+        {/* Price */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 12 }}>
+          <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-primary)' }}>
+            ฿{Number(product.price || 0).toLocaleString()}
+          </span>
+          <span style={{ fontSize: 14, color: 'var(--color-text-sub)' }}>/ {product.unit}</span>
+        </div>
+
+        {/* Details */}
+        <InfoRow label={`MOQ`}                value={`${moq} ${product.unit || ''}`} />
+        <InfoRow label={t('product.weight')}  value={product.weight_per_unit ? `${product.weight_per_unit} ${t('common.kg')}` : null} />
+        <InfoRow label={t('product.origin')}  value={product.origin_country} />
+
+        {/* Description */}
+        {product.description && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-main)', marginBottom: 4 }}>{t('product.description')}</div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-sub)', lineHeight: 1.6 }}>{product.description}</div>
+          </div>
+        )}
+
+        {/* Promotions */}
+        {product.promotions && product.promotions.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>🎁 โปรโมชั่น</div>
+            {product.promotions.map((promo, i) => (
+              <div
+                key={i}
+                style={{
+                  fontSize: 12, padding: '6px 10px',
+                  background: '#fffbe6', borderRadius: 8,
+                  border: '1px solid #ffe58f',
+                  marginBottom: 4, color: '#8a6d00',
+                }}
+              >
+                {promo.name_th || promo.name_en || promo.description || 'โปรโมชั่น'}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Seller info */}
+        <div
+          style={{
+            marginTop: 16, padding: 12, borderRadius: 'var(--radius-md)',
+            background: 'var(--color-bg)', border: '0.5px solid var(--color-border)',
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>🏪 {t('buyer.seller_info')}</div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-main)', fontWeight: 600 }}>
+            {product.shop_name || product.seller_name || '—'}
+          </div>
+          {product.address && (
+            <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginTop: 3 }}>
+              📍 {product.address}
+            </div>
+          )}
+          {product.seller_id && (onOpenChatRoom || onChatSeller) && (
+            <button
+              disabled={chatLoading}
+              onClick={async () => {
+                if (!onOpenChatRoom) {
+                  // Fallback: ส่ง seller_id ตรงๆ (BuyerChatPage จะสร้างห้องเอง)
+                  onChatSeller(product.seller_id);
+                  return;
+                }
+                // POST สร้าง/เปิดห้องก่อน แล้วค่อย navigate พร้อม room object
+                setChatLoading(true);
+                try {
+                  const res = await buyerApi.post('/chat/rooms', {
+                    type:     'seller_buyer',
+                    targetId: product.seller_id,
+                  });
+                  const room = res.data.room || res.data.data || res.data;
+                  if (room) {
+                    // Enrich ด้วยชื่อร้านที่เราทราบอยู่แล้ว (ไม่ต้อง fetch ซ้ำ)
+                    onOpenChatRoom({
+                      ...room,
+                      shop_name:   product.shop_name || product.seller_name,
+                      seller_name: product.shop_name || product.seller_name,
+                    });
+                  }
+                } catch (err) {
+                  console.error('[Chat] สร้างห้องไม่สำเร็จ:', err.response?.data || err.message);
+                } finally {
+                  setChatLoading(false);
+                }
+              }}
+              style={{
+                marginTop: 8, padding: '6px 14px', borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-primary)', background: 'white',
+                color: 'var(--color-primary)', fontSize: 12, fontWeight: 600,
+                cursor: chatLoading ? 'wait' : 'pointer',
+                fontFamily: 'var(--font-main)',
+                opacity: chatLoading ? 0.6 : 1,
+              }}
+            >
+              {chatLoading ? '⏳ กำลังเชื่อมต่อ...' : `💬 ${t('buyer.chat_with_seller')}`}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Order panel */}
+      {showOrder && (
+        <div
+          style={{
+            position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+            width: '100%', maxWidth: 480,
+            background: 'white', borderTop: '1px solid var(--color-border)',
+            padding: 16, boxSizing: 'border-box',
+            boxShadow: '0 -4px 16px rgba(0,0,0,0.12)', zIndex: 600,
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>📦 สั่งซื้อ</div>
+
+          {/* Qty */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: 'var(--color-text-sub)' }}>{t('buyer.qty')}</span>
+            <button
+              onClick={() => setQty((q) => Math.max(moq, q - moq))}
+              style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--color-border)', background: 'white', cursor: 'pointer', fontSize: 16 }}
+            >
+              −
+            </button>
+            <span style={{ fontSize: 16, fontWeight: 700, minWidth: 40, textAlign: 'center' }}>{qty}</span>
+            <button
+              onClick={() => setQty((q) => q + moq)}
+              style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'var(--color-primary)', color: 'white', cursor: 'pointer', fontSize: 16 }}
+            >
+              +
+            </button>
+            <span style={{ fontSize: 12, color: 'var(--color-text-hint)' }}>{product.unit}</span>
+          </div>
+
+          {/* Note */}
+          <textarea
+            placeholder="หมายเหตุ (ไม่บังคับ)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            style={{
+              width: '100%', padding: 8, borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border)', fontSize: 13,
+              fontFamily: 'var(--font-main)', boxSizing: 'border-box',
+              resize: 'none', outline: 'none', marginBottom: 8,
+            }}
+          />
+
+          {/* Total estimate */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 14 }}>
+            <span style={{ color: 'var(--color-text-sub)' }}>ยอดสินค้า</span>
+            <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+              ฿{(qty * Number(product.price)).toLocaleString()}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginBottom: 10 }}>
+            * ค่าขนส่งร้านค้ากำหนด — จ่ายปลายทาง
+          </div>
+
+          {/* Banner: ยังไม่มีที่อยู่จัดส่ง — แตะเพื่อไปหน้า Profile */}
+          {addressRequired && (
+            <div
+              onClick={() => {
+                setShowOrder(false);
+                if (onNavigate) onNavigate('profile', { returnTo: 'home' });
+              }}
+              style={{
+                background: '#FEF2F2', border: '1px solid #FECACA',
+                borderRadius: 10, padding: '10px 14px', cursor: 'pointer',
+                marginBottom: 12,
+              }}
+            >
+              <p style={{ color: '#DC2626', fontWeight: 700, fontSize: 13, margin: '0 0 2px' }}>
+                ⚠️ ยังไม่มีที่อยู่จัดส่ง
+              </p>
+              <p style={{ color: '#DC2626', fontSize: 12, margin: 0 }}>
+                แตะที่นี่เพื่อตั้งที่อยู่จัดส่ง →
+              </p>
+            </div>
+          )}
+
+          {error && <div className="error-box" style={{ marginBottom: 10 }}>{error}</div>}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setShowOrder(false)}
+              className="btn-secondary"
+              style={{ flex: 1 }}
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              onClick={handleOrder}
+              disabled={ordering || stock === 0}
+              className="btn-primary"
+              style={{ flex: 2 }}
+            >
+              {ordering ? t('common.loading') + '…' : '✅ ' + t('buyer.place_order')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky buy button */}
+      {!showOrder && (
+        <div
+          style={{
+            position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+            width: '100%', maxWidth: 480,
+            padding: '12px 16px', background: 'white',
+            borderTop: '0.5px solid var(--color-border)',
+            boxSizing: 'border-box', zIndex: 600,
+          }}
+        >
+          <button
+            onClick={() => { setError(''); setAddressRequired(false); setShowOrder(true); }}
+            disabled={stock === 0}
+            className="btn-primary"
+          >
+            {stock === 0 ? t('product.out_of_stock') : `🛒 ${t('buyer.place_order')}`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
