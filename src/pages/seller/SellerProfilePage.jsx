@@ -229,7 +229,7 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
             type="file"
             accept="image/*"
             ref={fileInputRef}
-            style={{ display: 'none' }}
+            style={{ position: 'absolute', width: 1, height: 1, padding: 0, opacity: 0, overflow: 'hidden' }}
             onChange={handleImageChange}
           />
           <div>

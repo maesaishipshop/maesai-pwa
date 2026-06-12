@@ -401,7 +401,7 @@ export default function BuyerProfilePage({ profile, setProfile, onProfileUpdated
               type="file"
               accept="image/*"
               ref={fileInputRef}
-              style={{ display: 'none' }}
+              style={{ position: 'absolute', width: 1, height: 1, padding: 0, opacity: 0, overflow: 'hidden' }}
               onChange={handleImageChange}
             />
             {imgErr && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginBottom: 4 }}>{imgErr}</div>}
