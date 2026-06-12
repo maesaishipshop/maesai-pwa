@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { IconShoppingCart, IconBuildingStore, IconShoppingBag, IconTruckDelivery } from '@tabler/icons-react';
 
 /* ── Language Switcher ─────────────────────────────── */
 function LanguageSwitcher() {
@@ -101,7 +102,7 @@ function LanguageSwitcher() {
 }
 
 /* ── Role Card ────────────────────────────────────── */
-function RoleCard({ icon, title, desc, color, onClick }) {
+function RoleCard({ icon, iconBg, iconColor, title, desc, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -131,18 +132,17 @@ function RoleCard({ icon, title, desc, color, onClick }) {
     >
       <div
         style={{
-          width: 52,
-          height: 52,
-          borderRadius: 14,
-          background: color + '18',
+          width: 48,
+          height: 48,
+          borderRadius: 12,
+          background: iconBg,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 26,
           flexShrink: 0,
         }}
       >
-        {icon}
+        {React.createElement(icon, { size: 24, color: iconColor, stroke: 2 })}
       </div>
 
       <div style={{ flex: 1 }}>
@@ -206,12 +206,11 @@ export default function LandingPage({ onSelectRole }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 20,
             margin: '0 auto 6px',
             border: '1.5px solid rgba(255,255,255,0.3)',
           }}
         >
-          🏪
+          <IconShoppingCart size={22} color="white" stroke={2} />
         </div>
 
         <h1 style={{ color: 'white', fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
@@ -250,24 +249,27 @@ export default function LandingPage({ onSelectRole }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <RoleCard
-            icon="🏪"
+            icon={IconBuildingStore}
+            iconBg="#DBEAFE"
+            iconColor="#2563EB"
             title={t('landing.seller')}
             desc={t('landing.seller_desc')}
-            color="#2D9B6E"
             onClick={() => onSelectRole('seller')}
           />
           <RoleCard
-            icon="🛍️"
+            icon={IconShoppingBag}
+            iconBg="#D1FAE5"
+            iconColor="#1F7A55"
             title={t('landing.buyer')}
             desc={t('landing.buyer_desc')}
-            color="#3B82F6"
             onClick={() => onSelectRole('buyer')}
           />
           <RoleCard
-            icon="🚚"
+            icon={IconTruckDelivery}
+            iconBg="#FEF3C7"
+            iconColor="#D97706"
             title={t('landing.driver')}
             desc={t('landing.driver_desc')}
-            color="#F59E0B"
             onClick={() => onSelectRole('driver')}
           />
         </div>
