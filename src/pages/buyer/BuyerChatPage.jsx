@@ -6,16 +6,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import buyerApi from '../../api/buyer.api';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
-function toImgUrl(path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  // Bug fix: ใส่ '/' คั่นกรณี path ไม่มี leading slash (เช่น 'uploads/chat/xxx.png')
-  const p = path.startsWith('/') ? path : `/${path}`;
-  return `${BACKEND_URL}${p}`;
-}
+import { toImgUrl } from '../../utils/imageUrl';
 
 /* ── helper: format timestamp ───────────────────────── */
 function formatTime(ts) {

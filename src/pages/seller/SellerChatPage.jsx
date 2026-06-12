@@ -7,15 +7,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi from '../../api/seller.api';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
-function toImgUrl(path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  const p = path.startsWith('/') ? path : `/${path}`;
-  return `${BACKEND_URL}${p}`;
-}
+import { toImgUrl } from '../../utils/imageUrl';
 
 /* ── helper: format timestamp ───────────────────────── */
 function formatTime(ts) {

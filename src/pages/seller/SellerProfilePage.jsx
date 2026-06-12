@@ -3,9 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi, { clearToken } from '../../api/seller.api';
-
-// BACKEND_URL = '' → รูปใช้ relative path (/uploads/...) → proxy forward ให้
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+import { BACKEND_URL } from '../../utils/imageUrl';
 
 function MapEmbed({ lat, lng }) {
   // normalize → Number, guard NaN / null / ''

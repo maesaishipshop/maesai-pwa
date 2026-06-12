@@ -4,14 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import buyerApi from '../../api/buyer.api';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
-function toImgUrl(path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return `${BACKEND_URL}${path}`;
-}
+import { toImgUrl } from '../../utils/imageUrl';
 
 /**
  * getVideoThumbnail(videoUrl)

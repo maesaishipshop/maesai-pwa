@@ -4,15 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import adminApi from '../../api/admin.api';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
-function toImgUrl(path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  const p = path.startsWith('/') ? path : `/${path}`;
-  return `${BACKEND_URL}${p}`;
-}
+import { toImgUrl } from '../../utils/imageUrl';
 
 function formatTime(ts) {
   if (!ts) return '';

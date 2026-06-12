@@ -5,14 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import buyerApi from '../../api/buyer.api';
 import BuyerProductDetailPage from './BuyerProductDetailPage';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
-function toImgUrl(path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return `${BACKEND_URL}${path}`;
-}
+import { toImgUrl } from '../../utils/imageUrl';
 
 /* ── Product Card ────────────────────────────────── */
 function ProductCard({ product, onClick }) {

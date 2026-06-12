@@ -2,15 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-// BACKEND_URL = '' → รูปใช้ relative path (/uploads/...) → proxy forward ให้
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
-function toImgUrl(path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return `${BACKEND_URL}${path}`;
-}
+import { toImgUrl } from '../../utils/imageUrl';
 
 // แสดงรูปโปรไฟล์วงกลม ถ้าโหลดไม่ได้ → fallback เป็น emoji
 function ProfileIcon({ profileImage, isActive }) {

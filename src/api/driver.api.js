@@ -3,18 +3,12 @@
 // Memory token pattern เหมือน buyer.api.js / seller.api.js
 
 import axios from 'axios';
+import { BACKEND_URL, toImgUrl } from '../utils/imageUrl';
 
-// BACKEND_URL = '' → รูปใช้ relative path (/uploads/...) → ผ่าน proxy ได้
-export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 // Proxy ใน dev: React dev server (3001) forward /api → backend (3000)
-const API_BASE           = process.env.REACT_APP_API_URL    || '/api';
+const API_BASE = process.env.REACT_APP_API_URL || '/api';
 
-/* ─── Helper: แปลง relative path → full URL ─────── */
-export function toImgUrl(path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return `${BACKEND_URL}${path}`;
-}
+export { BACKEND_URL, toImgUrl };
 
 /* ─── In-memory token storage ─────────────────────── */
 let _accessToken = null;

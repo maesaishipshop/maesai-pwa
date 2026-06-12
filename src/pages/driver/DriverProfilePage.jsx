@@ -3,9 +3,7 @@
 
 import React, { useState, useRef } from 'react';
 import driverApi, { clearToken } from '../../api/driver.api';
-
-// BACKEND_URL = '' → รูปใช้ relative path (/uploads/...) → proxy forward ให้
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+import { BACKEND_URL } from '../../utils/imageUrl';
 
 function InfoRow({ label, value, editable }) {
   if (!value) return null;

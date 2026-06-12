@@ -20,8 +20,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi from '../../api/seller.api';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+import { BACKEND_URL } from '../../utils/imageUrl';
 
 /**
  * getVideoThumbnail(videoUrl)

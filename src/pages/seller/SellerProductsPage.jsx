@@ -10,16 +10,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi from '../../api/seller.api';
 import ProductFormModal from '../../components/seller/ProductFormModal';
-
-// BACKEND_URL = '' → รูปใช้ relative path (/uploads/...) → proxy forward ให้
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
-// แปลง image_path เป็น URL เต็ม
-function toImgUrl(path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return `${BACKEND_URL}${path}`;
-}
+import { toImgUrl } from '../../utils/imageUrl';
 
 /**
  * getVideoThumbnail(videoUrl)
