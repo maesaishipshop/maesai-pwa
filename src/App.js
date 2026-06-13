@@ -123,6 +123,7 @@ export default function App() {
     if (type === 'buyer')  clearBuyer();
     if (type === 'driver') clearDriver();
     if (type === 'admin')  clearAdmin();
+    sessionStorage.removeItem(`mm_${type}_tab`);
     setPage('landing');
   }, []);
 
@@ -161,6 +162,10 @@ export default function App() {
     setBuyerToken(null);
     setDriverToken(null);
     setAdminToken(null);
+    sessionStorage.removeItem('mm_seller_tab');
+    sessionStorage.removeItem('mm_buyer_tab');
+    sessionStorage.removeItem('mm_driver_tab');
+    sessionStorage.removeItem('mm_admin_tab');
     setPage('landing');
   }
 

@@ -30,7 +30,7 @@ function Toast({ msg, onDone }) {
 /* ── Main BuyerApp ───────────────────────────────── */
 export default function BuyerApp({ onLogout, accessToken }) {
   const { t } = useTranslation();
-  const [tab, setTab]                   = useState('home');
+  const [tab, setTab]                   = useState(() => sessionStorage.getItem('mm_buyer_tab') || 'home');
   const [profile, setProfile]           = useState(null);
   const [pendingCount, setPending]      = useState(0);
   const [unreadChat, setUnreadChat]     = useState(0);
@@ -53,6 +53,9 @@ export default function BuyerApp({ onLogout, accessToken }) {
 
   // sync tabRef ทุกครั้งที่ tab เปลี่ยน
   useEffect(() => { tabRef.current = tab; }, [tab]);
+
+  // persist tab ลง sessionStorage — กันหน้าเด้งกลับ home ตอน refresh
+  useEffect(() => { sessionStorage.setItem('mm_buyer_tab', tab); }, [tab]);
 
   /* ── Load profile ────────────────────────────── */
   const loadProfile = useCallback(async () => {

@@ -44,7 +44,7 @@ function playBeep() {
 
 /* ── DriverApp ───────────────────────────────────── */
 export default function DriverApp({ onLogout, accessToken }) {
-  const [tab, setTab]               = useState('home');
+  const [tab, setTab]               = useState(() => sessionStorage.getItem('mm_driver_tab') || 'home');
   const [profile, setProfile]       = useState(null);
   const [newOrderCount, setNewOrder] = useState(0); // badge งานใหม่
   const [chatUnread, setChatUnread] = useState(0);  // badge แชทที่ยังไม่อ่าน
@@ -57,6 +57,9 @@ export default function DriverApp({ onLogout, accessToken }) {
 
   // sync tabRef ทุกครั้งที่ tab เปลี่ยน เพื่อให้ socket listener อ่านค่าล่าสุดได้
   useEffect(() => { tabRef.current = tab; }, [tab]);
+
+  // persist tab ลง sessionStorage — กันหน้าเด้งกลับ home ตอน refresh
+  useEffect(() => { sessionStorage.setItem('mm_driver_tab', tab); }, [tab]);
 
   /* ── Load driver profile ─────────────────────── */
   const loadProfile = useCallback(async () => {

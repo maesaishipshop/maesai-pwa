@@ -53,7 +53,7 @@ function Toast({ msg, onDone }) {
 // → ป้องกัน socket connect ด้วย token = null เพราะ getToken() ยังไม่ถูก set
 export default function SellerApp({ onLogout, accessToken }) {
   const { t } = useTranslation();
-  const [tab, setTab]               = useState('home');
+  const [tab, setTab]               = useState(() => sessionStorage.getItem('mm_seller_tab') || 'home');
   const [profile, setProfile]       = useState(null);
   const [pendingCount, setPending]  = useState(0);
   const [chatUnread, setChatUnread] = useState(0);
@@ -65,6 +65,9 @@ export default function SellerApp({ onLogout, accessToken }) {
 
   // sync tabRef ทุกครั้งที่ tab เปลี่ยน เพื่อให้ socket listener อ่านค่าล่าสุดได้
   useEffect(() => { tabRef.current = tab; }, [tab]);
+
+  // persist tab ลง sessionStorage — กันหน้าเด้งกลับ home ตอน refresh
+  useEffect(() => { sessionStorage.setItem('mm_seller_tab', tab); }, [tab]);
 
   /* ── Load seller profile ─────────────────────── */
   const loadProfile = useCallback(async () => {

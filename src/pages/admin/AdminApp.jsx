@@ -30,12 +30,15 @@ function Toast({ msg, onDone }) {
 
 /* ── AdminApp ───────────────────────────────────────── */
 export default function AdminApp({ onLogout }) {
-  const [tab,            setTab]            = useState('dashboard');
+  const [tab,            setTab]            = useState(() => sessionStorage.getItem('mm_admin_tab') || 'dashboard');
   const [toast,          setToast]          = useState('');
   const [pendingDrivers, setPendingDrivers] = useState(0);
   const [chatUnread,     setChatUnread]     = useState(0);
 
   function showToast(msg) { setToast(msg); }
+
+  // persist tab ลง sessionStorage — กันหน้าเด้งกลับ dashboard ตอน refresh
+  useEffect(() => { sessionStorage.setItem('mm_admin_tab', tab); }, [tab]);
 
   /* ── Logout listener ─────────────────────────────── */
   useEffect(() => {
