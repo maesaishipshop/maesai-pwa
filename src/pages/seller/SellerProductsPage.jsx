@@ -93,6 +93,7 @@ function VideoModal({ product, onClose, onVideoUpdated }) {
       fd.append('video', previewFile);
       const res = await sellerApi.post(`/products/${product.id}/video`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 0, // ไม่จำกัด — ไฟล์วิดีโอใหญ่ (สูงสุด 200MB) บน mobile อาจใช้เวลาอัปโหลดนานกว่า default 15s
         onUploadProgress: (e) => {
           if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100));
         },
@@ -107,6 +108,7 @@ function VideoModal({ product, onClose, onVideoUpdated }) {
       if (videoFileInputRef.current) videoFileInputRef.current.value = '';
       onVideoUpdated(product.id, newPath);
     } catch (err) {
+      console.error('Video upload error:', err);
       const code = err.response?.status;
       if (code === 413) setVideoError('ไฟล์ใหญ่เกิน 200MB');
       else if (code === 400) setVideoError('ไฟล์ประเภทนี้ไม่รองรับ (ใช้ mp4, mov, webm)');
