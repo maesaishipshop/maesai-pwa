@@ -32,9 +32,14 @@ export default function AdminLoginPage({ navigate, onLoginSuccess }) {
         setStep(2);
       }
     } catch (err) {
-      const msg = err.response?.data?.message || '';
-      if (err.response?.status === 401) {
+      const msg    = err.response?.data?.message || '';
+      const status = err.response?.status;
+      if (status === 429 || msg === 'TOO_MANY_REQUESTS') {
+        setError(t('auth.too_many_requests'));
+      } else if (status === 401) {
         setError(t('auth.invalid_credentials'));
+      } else if (!err.response) {
+        setError(t('auth.network_error'));
       } else {
         setError(msg || t('common.error'));
       }
@@ -54,8 +59,15 @@ export default function AdminLoginPage({ navigate, onLoginSuccess }) {
       setToken(token);
       onLoginSuccess('admin', token);
     } catch (err) {
-      const msg = err.response?.data?.message || '';
-      setError(msg || t('common.error'));
+      const msg    = err.response?.data?.message || '';
+      const status = err.response?.status;
+      if (status === 429 || msg === 'TOO_MANY_REQUESTS') {
+        setError(t('auth.too_many_requests'));
+      } else if (!err.response) {
+        setError(t('auth.network_error'));
+      } else {
+        setError(msg || t('common.error'));
+      }
     } finally {
       setLoading(false);
     }

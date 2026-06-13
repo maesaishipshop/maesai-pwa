@@ -31,11 +31,16 @@ export default function SellerLoginPage({ navigate, onLoginSuccess }) {
       setToken(token);
       onLoginSuccess('seller', token);
     } catch (err) {
-      const msg = err.response?.data?.message || '';
+      const msg    = err.response?.data?.message || '';
+      const status = err.response?.status;
       if (msg === 'ACCOUNT_SUSPENDED') {
         setError(t('auth.account_suspended'));
-      } else if (msg === 'INVALID_CREDENTIALS' || err.response?.status === 401) {
+      } else if (status === 429 || msg === 'TOO_MANY_REQUESTS') {
+        setError(t('auth.too_many_requests'));
+      } else if (msg === 'INVALID_CREDENTIALS' || status === 401) {
         setError(t('auth.invalid_credentials'));
+      } else if (!err.response) {
+        setError(t('auth.network_error'));
       } else {
         setError(msg || t('common.error'));
       }

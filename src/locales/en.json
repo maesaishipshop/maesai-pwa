@@ -67,6 +67,8 @@
     "vehicle_truck": "Truck",
     "account_suspended": "Account has been suspended",
     "account_blacklisted": "Account has been permanently banned",
+    "too_many_requests": "Too many login attempts. Please wait a moment and try again.",
+    "network_error": "Unable to connect. Please check your internet connection.",
     "step1_credential": "Enter email and password",
     "step2_otp": "Verify identity"
   },
