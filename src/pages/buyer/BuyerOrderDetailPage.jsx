@@ -7,7 +7,6 @@ import buyerApi from '../../api/buyer.api';
 
 const STATUS_ORDER = [
   'pending_seller',
-  'confirmed',
   'ready_for_pickup',
   'driver_assigned',
   'picked_up',

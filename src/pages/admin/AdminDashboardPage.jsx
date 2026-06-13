@@ -190,7 +190,6 @@ export default function AdminDashboardPage({ showToast, onNavigate }) {
           }}>
             {[
               { key: 'pending_seller', label: '⏳ รอ Seller รับ',     color: '#f59e0b' },
-              { key: 'confirmed',      label: '✅ Seller รับแล้ว',    color: '#3b82f6' },
               { key: 'ready_for_pickup', label: '📦 รอ Driver รับ',   color: '#7c3aed' },
               { key: 'driver_assigned',  label: '🚗 Driver กำลังไป', color: '#0891b2' },
               { key: 'picked_up',      label: '🏃 กำลังส่ง',         color: '#0284c7' },

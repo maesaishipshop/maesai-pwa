@@ -8,7 +8,6 @@ import buyerApi from '../../api/buyer.api';
 const STATUS_TABS = [
   { key: '',                 labelKey: 'common.all'                   },
   { key: 'pending_seller',  labelKey: 'order.status_pending_seller'   },
-  { key: 'confirmed',       labelKey: 'order.status_confirmed'        },
   { key: 'ready_for_pickup',labelKey: 'order.status_ready_for_pickup' },
   { key: 'picked_up',       labelKey: 'order.status_picked_up'       },
   { key: 'delivered',       labelKey: 'order.status_delivered'       },
@@ -19,7 +18,6 @@ const STATUS_TABS = [
 
 const STATUS_BADGE = {
   pending_seller:   'badge-warning',
-  confirmed:        'badge-info',
   ready_for_pickup: 'badge-info',
   driver_assigned:  'badge-info',
   picked_up:        'badge-info',

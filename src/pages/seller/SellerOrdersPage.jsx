@@ -6,7 +6,6 @@ import sellerApi from '../../api/seller.api';
 
 const STATUS_TABS = [
   { key: 'pending_seller',   labelKey: 'seller.order_pending'    },
-  { key: 'confirmed',        labelKey: 'seller.order_confirmed'  },
   { key: 'ready_for_pickup', labelKey: 'seller.order_ready'      },
   { key: 'picked_up',        labelKey: 'seller.order_delivering' },
   { key: 'completed',        labelKey: 'seller.order_completed'  },
@@ -15,7 +14,6 @@ const STATUS_TABS = [
 
 const STATUS_BADGE = {
   pending_seller:   'badge-warning',
-  confirmed:        'badge-info',
   ready_for_pickup: 'badge-info',
   driver_assigned:  'badge-info',
   picked_up:        'badge-info',
@@ -157,19 +155,6 @@ function OrderCard({ order, onAction, actionLoading, onPrinted, selectionMode, i
                 </button>
               </>
             )}
-            {status === 'confirmed' && (
-              <button
-                onClick={() => onAction(order.id, 'ready')}
-                disabled={loading}
-                style={{
-                  flex: 1, padding: '8px', borderRadius: 'var(--radius-md)',
-                  border: 'none', background: 'var(--color-primary)', color: 'white',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-main)',
-                }}
-              >
-                {loading ? '…' : t('seller.ready_order')}
-              </button>
-            )}
             {status === 'delivered' && (
               <div style={{ fontSize: 12, color: 'var(--color-text-hint)', flex: 1, padding: '8px 0' }}>
                 ⏳ รอลูกค้ายืนยัน
@@ -198,7 +183,6 @@ function OrderCard({ order, onAction, actionLoading, onPrinted, selectionMode, i
 // statuses ที่แต่ละ tab แสดง (รวม driver_assigned ใน tab กำลังส่ง)
 const TAB_FILTER = {
   pending_seller:   ['pending_seller'],
-  confirmed:        ['confirmed'],
   ready_for_pickup: ['ready_for_pickup'],
   picked_up:        ['driver_assigned', 'picked_up'],
   completed:        ['completed'],
@@ -208,7 +192,6 @@ const TAB_FILTER = {
 // tabs ที่แสดง badge count (เฉพาะที่มีความหมาย)
 const TAB_BADGE_STATUSES = {
   pending_seller:   ['pending_seller'],
-  confirmed:        ['confirmed'],
   ready_for_pickup: ['ready_for_pickup'],
   picked_up:        ['driver_assigned', 'picked_up'],
 };

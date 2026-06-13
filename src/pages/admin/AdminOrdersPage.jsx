@@ -9,7 +9,6 @@ import adminApi from '../../api/admin.api';
 const STATUS_FILTERS = [
   { key: 'all',              label: 'ทั้งหมด'    },
   { key: 'pending_seller',   label: 'รอรับ'      },
-  { key: 'confirmed',        label: 'รับแล้ว'    },
   { key: 'ready_for_pickup', label: 'รอ Driver'  },
   { key: 'picked_up',        label: 'กำลังส่ง'   },
   { key: 'delivered',        label: 'ส่งแล้ว'    },
@@ -21,7 +20,6 @@ const STATUS_FILTERS = [
 function statusLabel(s) {
   const m = {
     pending_seller:   '⏳ รอ Seller',
-    confirmed:        '✅ รับแล้ว',
     ready_for_pickup: '📦 รอ Driver',
     driver_assigned:  '🚗 Driver กำลังไป',
     picked_up:        '🏃 กำลังส่ง',
