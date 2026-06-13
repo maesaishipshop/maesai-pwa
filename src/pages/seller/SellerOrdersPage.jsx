@@ -341,8 +341,8 @@ export default function SellerOrdersPage({ onPendingCountChange }) {
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      {/* Top bar */}
-      <div className="top-bar">
+      {/* Top bar — paddingRight เผื่อพื้นที่กระดิ่งแจ้งเตือน (fixed top:16 right:16 width:38px) ไม่ให้ทับปุ่มขวาสุด */}
+      <div className="top-bar" style={{ paddingRight: 60 }}>
         <span className="top-bar-title">{t('seller.orders')}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button

@@ -665,7 +665,8 @@ export default function SellerChatPage({ socket, onUnreadChange }) {
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      <div className="top-bar">
+      {/* paddingRight เผื่อพื้นที่กระดิ่งแจ้งเตือน (fixed top:16 right:16 width:38px) ไม่ให้ทับปุ่ม 🔄 */}
+      <div className="top-bar" style={{ paddingRight: 60 }}>
         <span className="top-bar-title">💬 {t('nav.chat') || 'แชท'}</span>
         <button
           onClick={loadRooms}

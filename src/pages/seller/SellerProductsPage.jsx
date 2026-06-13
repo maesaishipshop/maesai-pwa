@@ -521,7 +521,8 @@ export default function SellerProductsPage() {
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      <div className="top-bar" style={{ background: 'white' }}>
+      {/* paddingRight เผื่อพื้นที่กระดิ่งแจ้งเตือน (fixed top:16 right:16 width:38px) ไม่ให้ทับปุ่ม "+" */}
+      <div className="top-bar" style={{ background: 'white', paddingRight: 60 }}>
         <span className="top-bar-title">{t('seller.my_products')}</span>
         <button
           onClick={openAdd}

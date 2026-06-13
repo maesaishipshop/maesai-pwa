@@ -168,7 +168,8 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      <div className="top-bar">
+      {/* paddingRight เผื่อพื้นที่กระดิ่งแจ้งเตือน (fixed top:16 right:16 width:38px) ไม่ให้ทับปุ่ม "แก้ไข" */}
+      <div className="top-bar" style={{ paddingRight: 60 }}>
         <span className="top-bar-title">{t('seller.profile')}</span>
         {!editing && (
           <button
