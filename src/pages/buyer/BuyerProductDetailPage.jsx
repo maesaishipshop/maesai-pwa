@@ -34,7 +34,9 @@ function getVideoThumbnail(videoUrl) {
 
 /* ── Image gallery ───────────────────────────────── */
 function ImageGallery({ images }) {
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx]         = useState(0);
+  const touchStartX            = React.useRef(null);
+
   if (!images || images.length === 0) {
     return (
       <div
@@ -48,17 +50,31 @@ function ImageGallery({ images }) {
       </div>
     );
   }
+
+  const total   = images.length;
+  const prev    = () => setIdx((i) => (i - 1 + total) % total);
+  const next    = () => setIdx((i) => (i + 1) % total);
   const current = images[idx];
-  const url = toImgUrl(current?.image_path || current);
+  const url     = toImgUrl(current?.image_path || current);
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchEnd(e) {
+    if (touchStartX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (delta > 50)  prev();
+    if (delta < -50) next();
+  }
 
   return (
     <div>
+      {/* Main image + swipe + arrows */}
       <div
-        style={{
-          height: 240, background: '#000',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden',
-        }}
+        style={{ position: 'relative', height: 240, background: '#000', overflow: 'hidden' }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         <img
           src={url}
@@ -66,8 +82,60 @@ function ImageGallery({ images }) {
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           onError={(e) => { e.target.style.display = 'none'; }}
         />
+
+        {/* Arrow buttons — แสดงเฉพาะเมื่อมีมากกว่า 1 รูป */}
+        {total > 1 && (
+          <>
+            <button
+              onClick={prev}
+              style={{
+                position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                width: 32, height: 32, borderRadius: '50%',
+                background: 'rgba(0,0,0,0.45)', border: 'none',
+                color: 'white', fontSize: 18, lineHeight: 1,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              ‹
+            </button>
+            <button
+              onClick={next}
+              style={{
+                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                width: 32, height: 32, borderRadius: '50%',
+                background: 'rgba(0,0,0,0.45)', border: 'none',
+                color: 'white', fontSize: 18, lineHeight: 1,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              ›
+            </button>
+            {/* Dot indicator */}
+            <div
+              style={{
+                position: 'absolute', bottom: 8, left: 0, right: 0,
+                display: 'flex', justifyContent: 'center', gap: 5,
+              }}
+            >
+              {images.map((_, i) => (
+                <div
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  style={{
+                    width: i === idx ? 16 : 6, height: 6, borderRadius: 3,
+                    background: i === idx ? 'white' : 'rgba(255,255,255,0.5)',
+                    transition: 'width 0.2s',
+                    cursor: 'pointer',
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
-      {images.length > 1 && (
+
+      {/* Thumbnail strip */}
+      {total > 1 && (
         <div style={{ display: 'flex', gap: 6, padding: '8px 16px', overflowX: 'auto' }}>
           {images.map((img, i) => {
             const thumbUrl = toImgUrl(img?.image_path || img);
