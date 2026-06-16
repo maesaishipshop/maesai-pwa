@@ -66,13 +66,15 @@ const EMPTY_FORM = {
 
 export default function ProductFormModal({ open, product, onClose, onSaved }) {
   const { t } = useTranslation();
-  const [form, setForm]             = useState(EMPTY_FORM);
-  const [errors, setErrors]         = useState({});
-  const [categories, setCategories] = useState([]);
-  const [images, setImages]         = useState([]);
-  const [previews, setPreviews]     = useState([]);
-  const [loading, setLoading]       = useState(false);
-  const [apiError, setApiError]     = useState('');
+  const [form, setForm]               = useState(EMPTY_FORM);
+  const [errors, setErrors]           = useState({});
+  const [categories, setCategories]   = useState([]);
+  const [images, setImages]           = useState([]);
+  const [previews, setPreviews]       = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [apiError, setApiError]       = useState('');
+  const [existingImages, setExistingImages]     = useState([]); // รูปที่มีอยู่แล้วใน DB
+  const [deletingImageId, setDeletingImageId]   = useState(null); // id ที่กำลังลบ
   // Video upload state
   const [videoFile, setVideoFile]         = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
@@ -98,7 +100,6 @@ export default function ProductFormModal({ open, product, onClose, onSaved }) {
   useEffect(() => {
     if (open) {
       if (product) {
-        // Edit mode: map field names จาก backend response → form state
         setForm({
           name_th:         product.name_th          || '',
           category_id:     product.category_id      || '',
@@ -107,18 +108,23 @@ export default function ProductFormModal({ open, product, onClose, onSaved }) {
           moq:             product.moq              || '',
           stock:           product.stock            || '',
           weight_per_unit: product.weight_per_unit  || '',
-          origin_country:  product.origin_country   || '',  // ไม่ใช่ country_of_origin
+          origin_country:  product.origin_country   || '',
           description:     product.description      || '',
           is_active:       product.is_active !== false,
         });
+        // โหลดรูปปัจจุบันจาก API (getSellerProducts ส่งแค่ primary_image ไม่มี images[])
+        sellerApi.get(`/products/${product.id}`)
+          .then((r) => setExistingImages(r.data.product?.images || []))
+          .catch(() => setExistingImages([]));
       } else {
         setForm(EMPTY_FORM);
+        setExistingImages([]);
       }
       setImages([]);
       setPreviews([]);
       setErrors({});
       setApiError('');
-      // Reset video state
+      setDeletingImageId(null);
       setVideoFile(null);
       setVideoPreviewUrl(null);
       setVideoError('');
@@ -149,6 +155,19 @@ export default function ProductFormModal({ open, product, onClose, onSaved }) {
     if (!form.stock && form.stock !== 0) e.stock = t('common.error');
     // shipping_fee ถูกลบออก — ไม่มีใน products table
     return e;
+  }
+
+  async function handleDeleteExistingImage(imageId) {
+    if (!product?.id || deletingImageId) return;
+    setDeletingImageId(imageId);
+    try {
+      await sellerApi.delete(`/products/${product.id}/images/${imageId}`);
+      setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
+    } catch (err) {
+      setApiError(err.response?.data?.error || 'ลบรูปไม่สำเร็จ');
+    } finally {
+      setDeletingImageId(null);
+    }
   }
 
   function handleImageChange(e) {
@@ -448,7 +467,71 @@ export default function ProductFormModal({ open, product, onClose, onSaved }) {
 
           {/* รูปสินค้า */}
           <div className="form-group">
-            <label className="form-label">รูปสินค้า (สูงสุด 5 รูป)</label>
+            <label className="form-label">รูปสินค้า</label>
+
+            {/* รูปที่มีอยู่แล้ว (edit mode) — แสดงพร้อมปุ่มลบ */}
+            {existingImages.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginBottom: 6 }}>
+                  รูปปัจจุบัน ({existingImages.length} รูป)
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {existingImages.map((img) => (
+                    <div
+                      key={img.id}
+                      style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}
+                    >
+                      <img
+                        src={toImgUrl(img.image_path)}
+                        alt=""
+                        style={{
+                          width: '100%', height: '100%',
+                          objectFit: 'cover', borderRadius: 8,
+                          border: img.is_primary
+                            ? '2px solid var(--color-primary)'
+                            : '0.5px solid var(--color-border)',
+                          opacity: deletingImageId === img.id ? 0.4 : 1,
+                        }}
+                      />
+                      {/* ปุ่มลบรูป */}
+                      <button
+                        type="button"
+                        disabled={!!deletingImageId}
+                        onClick={() => handleDeleteExistingImage(img.id)}
+                        style={{
+                          position: 'absolute', top: -6, right: -6,
+                          width: 20, height: 20, borderRadius: '50%',
+                          background: deletingImageId === img.id ? '#999' : 'var(--color-danger)',
+                          border: 'none', color: 'white',
+                          fontSize: 12, lineHeight: 1,
+                          cursor: deletingImageId ? 'wait' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          padding: 0,
+                        }}
+                      >
+                        {deletingImageId === img.id ? '…' : '✕'}
+                      </button>
+                      {/* badge รูปหลัก */}
+                      {img.is_primary && (
+                        <div style={{
+                          position: 'absolute', bottom: 0, left: 0, right: 0,
+                          background: 'var(--color-primary)', color: 'white',
+                          fontSize: 9, textAlign: 'center', borderRadius: '0 0 6px 6px',
+                          padding: '1px 0',
+                        }}>
+                          หลัก
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* เพิ่มรูปใหม่ */}
+            <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginBottom: 4 }}>
+              เพิ่มรูปใหม่ (สูงสุด 5 รูปต่อครั้ง)
+            </div>
             <input
               type="file"
               accept="image/*"
