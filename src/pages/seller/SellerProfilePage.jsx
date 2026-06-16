@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi, { clearToken } from '../../api/seller.api';
-import { BACKEND_URL } from '../../utils/imageUrl';
+import { toImgUrl } from '../../utils/imageUrl';
 
 function MapEmbed({ lat, lng }) {
   // normalize → Number, guard NaN / null / ''
@@ -204,7 +204,7 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
             >
               {p.profile_image_path ? (
                 <img
-                  src={`${BACKEND_URL}${p.profile_image_path}`}
+                  src={toImgUrl(p.profile_image_path)}
                   alt="profile"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
@@ -384,7 +384,7 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
       {/* Image viewer modal */}
       {showImageViewer && p.profile_image_path && (
         <ImageViewer
-          src={`${BACKEND_URL}${p.profile_image_path}`}
+          src={toImgUrl(p.profile_image_path)}
           onClose={() => setShowImageViewer(false)}
         />
       )}

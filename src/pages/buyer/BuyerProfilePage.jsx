@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import buyerApi, { clearToken } from '../../api/buyer.api';
-import { BACKEND_URL } from '../../utils/imageUrl';
+import { toImgUrl } from '../../utils/imageUrl';
 
 /* ── Map embed (OpenStreetMap) ───────────────────── */
 function MapEmbed({ lat, lng }) {
@@ -375,7 +375,7 @@ export default function BuyerProfilePage({ profile, setProfile, onProfileUpdated
               >
                 {profile?.profile_image_path ? (
                   <img
-                    src={`${BACKEND_URL}${profile.profile_image_path}`}
+                    src={toImgUrl(profile.profile_image_path)}
                     alt="profile"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
@@ -684,7 +684,7 @@ export default function BuyerProfilePage({ profile, setProfile, onProfileUpdated
         {/* Image viewer modal */}
         {showImageViewer && profile?.profile_image_path && (
           <ImageViewer
-            src={`${BACKEND_URL}${profile.profile_image_path}`}
+            src={toImgUrl(profile.profile_image_path)}
             onClose={() => setShowImageViewer(false)}
           />
         )}

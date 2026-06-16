@@ -20,7 +20,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi from '../../api/seller.api';
-import { BACKEND_URL } from '../../utils/imageUrl';
+import { toImgUrl } from '../../utils/imageUrl';
 
 /**
  * getVideoThumbnail(videoUrl)
@@ -130,7 +130,7 @@ export default function ProductFormModal({ open, product, onClose, onSaved }) {
   /* ── Generate thumbnail เมื่อ currentVideoPath เปลี่ยน (มีวิดีโออยู่แล้ว) ── */
   useEffect(() => {
     if (!currentVideoPath) { setVideoPoster(null); return; }
-    const url = `${BACKEND_URL}${currentVideoPath}`;
+    const url = toImgUrl(currentVideoPath);
     getVideoThumbnail(url).then(setVideoPoster);
   }, [currentVideoPath]);
 
@@ -484,7 +484,7 @@ export default function ProductFormModal({ open, product, onClose, onSaved }) {
               {currentVideoPath && !videoPreviewUrl && (
                 <div style={{ marginBottom: 10 }}>
                   <video
-                    src={`${BACKEND_URL}${currentVideoPath}`}
+                    src={toImgUrl(currentVideoPath)}
                     poster={videoPoster || undefined}
                     controls
                     playsInline

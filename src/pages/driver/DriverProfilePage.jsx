@@ -3,7 +3,7 @@
 
 import React, { useState, useRef } from 'react';
 import driverApi, { clearToken } from '../../api/driver.api';
-import { BACKEND_URL } from '../../utils/imageUrl';
+import { toImgUrl } from '../../utils/imageUrl';
 
 function InfoRow({ label, value, editable }) {
   if (!value) return null;
@@ -176,7 +176,7 @@ export default function DriverProfilePage({ profile, onProfileUpdated, onLogout,
             >
               {p.profile_image_path ? (
                 <img
-                  src={`${BACKEND_URL}${p.profile_image_path}`}
+                  src={toImgUrl(p.profile_image_path)}
                   alt="profile"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
