@@ -1,7 +1,7 @@
 // src/pages/buyer/BuyerProductDetailPage.jsx
 // รายละเอียดสินค้า — รูปหลายรูป, info seller, qty (MOQ), place order
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import buyerApi from '../../api/buyer.api';
 import { toImgUrl } from '../../utils/imageUrl';
@@ -32,10 +32,149 @@ function getVideoThumbnail(videoUrl) {
   });
 }
 
+/* ── Lightbox (fullscreen overlay) ──────────────── */
+function ImageLightbox({ images, initialIdx, onClose }) {
+  const [idx, setIdx]   = useState(initialIdx);
+  const touchStartX     = useRef(null);
+  const total           = images.length;
+
+  // ล็อก body scroll ตอน lightbox เปิด
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // keyboard ESC / arrow
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape')     onClose();
+      if (e.key === 'ArrowLeft')  setIdx((i) => (i - 1 + total) % total);
+      if (e.key === 'ArrowRight') setIdx((i) => (i + 1) % total);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [total, onClose]);
+
+  function handleTouchStart(e) { touchStartX.current = e.touches[0].clientX; }
+  function handleTouchEnd(e) {
+    if (touchStartX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (delta > 50)  setIdx((i) => (i - 1 + total) % total);
+    if (delta < -50) setIdx((i) => (i + 1) % total);
+  }
+
+  const url = toImgUrl(images[idx]?.image_path || images[idx]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.95)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      {/* ปุ่มปิด */}
+      <button
+        onClick={onClose}
+        style={{
+          position: 'absolute', top: 16, right: 16,
+          width: 36, height: 36, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.15)', border: 'none',
+          color: 'white', fontSize: 20, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1,
+        }}
+      >
+        ✕
+      </button>
+
+      {/* รูปหลัก — stopPropagation ป้องกัน click ผ่านไปปิด */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          width: '100%', maxWidth: 480,
+          height: '75vh',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'relative',
+        }}
+      >
+        <img
+          src={url}
+          alt="product fullscreen"
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
+
+        {/* Arrow buttons */}
+        {total > 1 && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx((i) => (i - 1 + total) % total); }}
+              style={{
+                position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                width: 40, height: 40, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.15)', border: 'none',
+                color: 'white', fontSize: 22,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              ‹
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx((i) => (i + 1) % total); }}
+              style={{
+                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                width: 40, height: 40, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.15)', border: 'none',
+                color: 'white', fontSize: 22,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              ›
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Dot indicator + counter */}
+      {total > 1 && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 12 }}
+        >
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
+            {idx + 1} / {total}
+          </div>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {images.map((_, i) => (
+              <div
+                key={i}
+                onClick={() => setIdx(i)}
+                style={{
+                  width: i === idx ? 16 : 6, height: 6, borderRadius: 3,
+                  background: i === idx ? 'white' : 'rgba(255,255,255,0.35)',
+                  transition: 'width 0.2s', cursor: 'pointer',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Image gallery ───────────────────────────────── */
 function ImageGallery({ images }) {
   const [idx, setIdx]         = useState(0);
-  const touchStartX            = React.useRef(null);
+  const [lightboxIdx, setLightboxIdx] = useState(null); // null = ปิด
+  const touchStartX            = useRef(null);
 
   if (!images || images.length === 0) {
     return (
@@ -70,6 +209,15 @@ function ImageGallery({ images }) {
 
   return (
     <div>
+      {/* Lightbox */}
+      {lightboxIdx !== null && (
+        <ImageLightbox
+          images={images}
+          initialIdx={lightboxIdx}
+          onClose={() => setLightboxIdx(null)}
+        />
+      )}
+
       {/* Main image + swipe + arrows */}
       <div
         style={{ position: 'relative', height: 240, background: '#000', overflow: 'hidden' }}
@@ -79,7 +227,8 @@ function ImageGallery({ images }) {
         <img
           src={url}
           alt="product"
-          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          onClick={() => setLightboxIdx(idx)}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'zoom-in' }}
           onError={(e) => { e.target.style.display = 'none'; }}
         />
 
