@@ -1,8 +1,9 @@
 // src/pages/seller/SellerOrdersPage.jsx
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi from '../../api/seller.api';
+import { toImgUrl } from '../../utils/imageUrl';
 
 const STATUS_TABS = [
   { key: 'pending_seller',   labelKey: 'seller.order_pending'    },
@@ -23,11 +24,26 @@ const STATUS_BADGE = {
   disputed:         'badge-danger',
 };
 
-function OrderCard({ order, onAction, actionLoading, onPrinted, selectionMode, isSelected, onToggleSelect }) {
+function OrderCard({ order, onAction, actionLoading, onPrinted, selectionMode, isSelected, onToggleSelect, onPaymentConfirmed }) {
   const { t } = useTranslation();
-  const status  = order.status;
-  const total   = Number(order.total || 0);
-  const loading = actionLoading === order.id;
+  const status    = order.status;
+  const total     = Number(order.total || 0);
+  const loading   = actionLoading === order.id;
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [showSlipViewer, setShowSlipViewer] = useState(false);
+
+  async function handleConfirmPayment() {
+    if (!window.confirm('ยืนยันว่าได้รับเงินโอนแล้ว?')) return;
+    setConfirmingPayment(true);
+    try {
+      await sellerApi.post(`/orders/${order.id}/confirm-payment`);
+      if (onPaymentConfirmed) onPaymentConfirmed(order.id);
+    } catch (err) {
+      alert(err.response?.data?.error === 'ALREADY_CONFIRMED' ? 'ยืนยันไปแล้ว' : 'เกิดข้อผิดพลาด');
+    } finally {
+      setConfirmingPayment(false);
+    }
+  }
 
   async function handlePrint() {
     // iOS Safari fix: window.open() ต้องเรียกก่อน await ทุกกรณี
@@ -125,7 +141,94 @@ function OrderCard({ order, onAction, actionLoading, onPrinted, selectionMode, i
           </div>
         )}
 
+        {/* Payment info */}
+        {order.payment_method && order.payment_method !== 'cod' && (
+          <div
+            style={{
+              marginTop: 10, padding: '8px 12px', borderRadius: 8,
+              background: order.payment_confirmed_at ? '#e8f5ef' : '#fff8e1',
+              border: `1px solid ${order.payment_confirmed_at ? '#a5d6a7' : '#ffe082'}`,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: order.payment_confirmed_at ? '#2e7d32' : '#8a6d00' }}>
+                {order.payment_method === 'promptpay' ? '📱 พร้อมเพย์' : '🏦 โอนธนาคาร'}
+              </span>
+              {order.payment_confirmed_at ? (
+                <span style={{ fontSize: 11, color: '#2e7d32' }}>✅ ยืนยันแล้ว</span>
+              ) : order.payment_slip_url ? (
+                <span style={{ fontSize: 11, color: '#8a6d00' }}>⏳ รอยืนยัน</span>
+              ) : (
+                <span style={{ fontSize: 11, color: 'var(--color-text-hint)' }}>รอลูกค้าส่งสลิป</span>
+              )}
+            </div>
+
+            {/* Slip preview */}
+            {order.payment_slip_url && (
+              <div style={{ marginBottom: 6 }}>
+                <img
+                  src={toImgUrl(order.payment_slip_url)}
+                  alt="slip"
+                  onClick={() => setShowSlipViewer(true)}
+                  style={{
+                    width: 64, height: 64, objectFit: 'cover',
+                    borderRadius: 6, border: '1px solid var(--color-border)',
+                    cursor: 'zoom-in',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* ปุ่มยืนยันรับเงิน */}
+            {order.payment_slip_url && !order.payment_confirmed_at && !selectionMode && (
+              <button
+                onClick={handleConfirmPayment}
+                disabled={confirmingPayment}
+                style={{
+                  padding: '6px 14px', borderRadius: 8,
+                  border: 'none', background: 'var(--color-primary)', color: 'white',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'var(--font-main)',
+                  opacity: confirmingPayment ? 0.6 : 1,
+                }}
+              >
+                {confirmingPayment ? '⏳ กำลังยืนยัน...' : '✅ ยืนยันรับเงินแล้ว'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* COD label */}
+        {(!order.payment_method || order.payment_method === 'cod') && (
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-hint)' }}>
+            💵 ชำระปลายทาง (COD)
+          </div>
+        )}
+
         {/* Action buttons — ซ่อนใน selection mode */}
+
+        {/* Slip fullscreen viewer */}
+        {showSlipViewer && order.payment_slip_url && (
+          <div
+            onClick={() => setShowSlipViewer(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 1000,
+              background: 'rgba(0,0,0,0.92)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <button
+              onClick={() => setShowSlipViewer(false)}
+              style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'white', fontSize: 28, cursor: 'pointer' }}
+            >✕</button>
+            <img
+              src={toImgUrl(order.payment_slip_url)}
+              alt="payment slip"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '90%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8 }}
+            />
+          </div>
+        )}
         {!selectionMode && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             {status === 'pending_seller' && (
@@ -270,6 +373,17 @@ export default function SellerOrdersPage({ onPendingCountChange }) {
       prev.map((o) =>
         o.id === orderId
           ? { ...o, is_printed: true, printed_at: new Date().toISOString() }
+          : o
+      )
+    );
+  }
+
+  // อัปเดต payment_confirmed_at ใน state ทันทีหลัง seller confirm
+  function handlePaymentConfirmed(orderId) {
+    setAllOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId
+          ? { ...o, payment_confirmed_at: new Date().toISOString() }
           : o
       )
     );
@@ -467,6 +581,7 @@ export default function SellerOrdersPage({ onPendingCountChange }) {
               selectionMode={selectionMode}
               isSelected={selectedIds.has(order.id)}
               onToggleSelect={handleToggleSelect}
+              onPaymentConfirmed={handlePaymentConfirmed}
             />
           ))
         )}

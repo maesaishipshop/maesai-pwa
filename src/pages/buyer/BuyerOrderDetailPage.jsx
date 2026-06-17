@@ -1,9 +1,10 @@
 // src/pages/buyer/BuyerOrderDetailPage.jsx
 // รายละเอียด order — timeline สถานะ, ยืนยันรับสินค้า, dispute, review
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import buyerApi from '../../api/buyer.api';
+import { toImgUrl } from '../../utils/imageUrl';
 
 const STATUS_ORDER = [
   'pending_seller',
@@ -202,6 +203,29 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onToast }) {
   const [disputeReason, setReason] = useState('');
   const [showReview, setShowReview]= useState(false);
   const [reviewed, setReviewed]    = useState(false);
+  const [uploadingSlip, setUploadingSlip] = useState(false);
+  const [slipPreview, setSlipPreview]     = useState(null);
+  const [showSlipViewer, setShowSlipViewer] = useState(false);
+  const slipInputRef = useRef(null);
+
+  async function handleSlipUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingSlip(true);
+    try {
+      const fd = new FormData();
+      fd.append('slip', file);
+      await buyerApi.post(`/orders/${orderId}/payment-slip`, fd);
+      setSlipPreview(null);
+      if (onToast) onToast('✅ ส่งสลิปสำเร็จ รอ Seller ยืนยัน');
+      loadOrder(); // reload เพื่อแสดง slip ล่าสุด
+    } catch (err) {
+      alert(err.response?.data?.error || 'ส่งสลิปไม่สำเร็จ');
+    } finally {
+      setUploadingSlip(false);
+      e.target.value = '';
+    }
+  }
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -383,10 +407,92 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onToast }) {
               ฿{Number(order.total || 0).toLocaleString()}
             </span>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 4 }}>
-            * จ่ายปลายทาง (ชำระเงินเมื่อรับสินค้า)
+          <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginTop: 6, paddingTop: 6, borderTop: '0.5px solid var(--color-border)' }}>
+            {(!order.payment_method || order.payment_method === 'cod')
+              ? '💵 ชำระปลายทาง (COD)'
+              : order.payment_method === 'promptpay'
+                ? '📱 พร้อมเพย์'
+                : '🏦 โอนเงินผ่านธนาคาร'
+            }
           </div>
         </div>
+
+        {/* Payment slip section — แสดงเฉพาะ payment != cod */}
+        {order.payment_method && order.payment_method !== 'cod' && (
+          <div
+            style={{
+              padding: 14, background: 'white', borderRadius: 'var(--radius-md)',
+              border: `1.5px solid ${order.payment_confirmed_at ? '#a5d6a7' : order.payment_slip_url ? '#ffe082' : 'var(--color-border)'}`,
+              marginBottom: 12,
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+              🧾 หลักฐานการชำระเงิน
+            </div>
+
+            {order.payment_confirmed_at ? (
+              <div style={{ fontSize: 13, color: '#2e7d32', fontWeight: 600 }}>
+                ✅ Seller ยืนยันรับเงินแล้ว
+              </div>
+            ) : order.payment_slip_url ? (
+              <div>
+                <div style={{ fontSize: 12, color: '#8a6d00', marginBottom: 8 }}>⏳ รอ Seller ยืนยัน</div>
+                <img
+                  src={toImgUrl(order.payment_slip_url)}
+                  alt="payment slip"
+                  onClick={() => setShowSlipViewer(true)}
+                  style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--color-border)', cursor: 'zoom-in' }}
+                />
+                <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 4 }}>แตะรูปเพื่อดูขยาย</div>
+                <button
+                  onClick={() => slipInputRef.current.click()}
+                  disabled={uploadingSlip}
+                  style={{
+                    marginTop: 8, padding: '6px 14px', borderRadius: 8,
+                    border: '1px solid var(--color-primary)', background: 'white',
+                    color: 'var(--color-primary)', fontSize: 12, cursor: 'pointer',
+                    fontFamily: 'var(--font-main)',
+                  }}
+                >
+                  🔄 เปลี่ยนสลิป
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginBottom: 10 }}>
+                  กรุณาโอนเงินและอัปโหลดสลิปเพื่อให้ Seller ยืนยัน
+                </div>
+                <button
+                  onClick={() => slipInputRef.current.click()}
+                  disabled={uploadingSlip}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '10px 16px', borderRadius: 10,
+                    border: '1.5px dashed var(--color-primary)',
+                    background: 'var(--color-primary-light)',
+                    color: 'var(--color-primary)', fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'var(--font-main)',
+                  }}
+                >
+                  {uploadingSlip ? '⏳ กำลังส่งสลิป...' : '📷 อัปโหลดสลิปการโอน'}
+                </button>
+              </div>
+            )}
+
+            <input type="file" accept="image/*" ref={slipInputRef} style={{ display: 'none' }} onChange={handleSlipUpload} />
+          </div>
+        )}
+
+        {/* Slip fullscreen viewer */}
+        {showSlipViewer && order.payment_slip_url && (
+          <div
+            onClick={() => setShowSlipViewer(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <button onClick={() => setShowSlipViewer(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'white', fontSize: 28, cursor: 'pointer' }}>✕</button>
+            <img src={toImgUrl(order.payment_slip_url)} alt="slip" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8 }} />
+          </div>
+        )}
 
         {/* Delivery address */}
         {order.delivery_address && (

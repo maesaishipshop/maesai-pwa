@@ -5,6 +5,31 @@ import { useTranslation } from 'react-i18next';
 import sellerApi, { clearToken } from '../../api/seller.api';
 import { toImgUrl } from '../../utils/imageUrl';
 
+// ── QR Image viewer ─────────────────────────────────────────────
+function QrViewer({ src, onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(0,0,0,0.9)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <button
+        onClick={onClose}
+        style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'white', fontSize: 28, cursor: 'pointer' }}
+      >✕</button>
+      <img
+        src={src}
+        alt="QR PromptPay"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '90%', maxHeight: '80vh', objectFit: 'contain', borderRadius: 8 }}
+      />
+    </div>
+  );
+}
+
 function MapEmbed({ lat, lng }) {
   // normalize → Number, guard NaN / null / ''
   const validLat = lat && !isNaN(Number(lat)) ? Number(lat) : null;
@@ -79,6 +104,30 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
   const [pwLoading, setPwLoad]  = useState(false);
   const [showPw, setShowPw]     = useState(false);
 
+  // QR PromptPay upload
+  const qrInputRef                = useRef(null);
+  const [uploadingQr, setUploadQr] = useState(false);
+  const [qrErr, setQrErr]          = useState('');
+  const [showQrViewer, setShowQrViewer] = useState(false);
+
+  async function handleQrChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadQr(true);
+    setQrErr('');
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      await sellerApi.post('/sellers/profile/qr', fd);
+      if (onProfileUpdated) onProfileUpdated();
+    } catch {
+      setQrErr('อัปโหลด QR ไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setUploadQr(false);
+      e.target.value = '';
+    }
+  }
+
   function startEdit() {
     setForm({
       phone:            profile?.phone            || '',
@@ -91,6 +140,8 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
       bank_account_name:   profile?.bank_account_name   || '',
       lat: profile?.lat || '',
       lng: profile?.lng || '',
+      cod_fee:          profile?.cod_fee != null ? String(profile.cod_fee) : '0',
+      promptpay_number: profile?.promptpay_number || '',
     });
     setError('');
     setEditing(true);
@@ -116,6 +167,8 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
         bank_account_name: form.bank_account_name,
         lat: form.lat ? Number(form.lat) : null,
         lng: form.lng ? Number(form.lng) : null,
+        cod_fee:           form.cod_fee !== '' ? Number(form.cod_fee) : 0,
+        promptpay_number:  form.promptpay_number || null,
       });
       setEditing(false);
       if (onProfileUpdated) onProfileUpdated();
@@ -294,7 +347,7 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
             {/* บัญชีธนาคาร — clickable */}
             <div
               className="card"
-              style={{ marginBottom: 20, cursor: 'pointer' }}
+              style={{ marginBottom: 12, cursor: 'pointer' }}
               onClick={startEdit}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -306,6 +359,76 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
               <InfoRow label="ชื่อบัญชี" value={p.bank_account_name} editable />
               <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 10, textAlign: 'center' }}>
                 แตะเพื่อแก้ไขข้อมูล
+              </div>
+            </div>
+
+            {/* การชำระเงิน */}
+            <div className="card" style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div className="section-title" style={{ margin: 0 }}>💳 การรับชำระเงิน</div>
+                <button
+                  onClick={startEdit}
+                  style={{ background: 'none', border: 'none', fontSize: 12, color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'var(--font-main)' }}
+                >
+                  ✏️ แก้ไข
+                </button>
+              </div>
+
+              {/* COD fee */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--color-text-sub)' }}>💵 เก็บเงินปลายทาง (COD)</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>
+                  {p.cod_fee > 0 ? `ค่าธรรมเนียม ฿${Number(p.cod_fee).toLocaleString()}` : 'ไม่มีค่าธรรมเนียม'}
+                </span>
+              </div>
+
+              {/* PromptPay */}
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginBottom: 4 }}>📱 พร้อมเพย์</div>
+                {p.promptpay_number ? (
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{p.promptpay_number}</div>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--color-text-hint)' }}>ยังไม่ได้ตั้งค่า</div>
+                )}
+
+                {/* QR image */}
+                <div style={{ marginTop: 8 }}>
+                  {p.promptpay_qr_image ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <img
+                        src={toImgUrl(p.promptpay_qr_image)}
+                        alt="QR PromptPay"
+                        onClick={() => setShowQrViewer(true)}
+                        style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--color-border)', cursor: 'zoom-in' }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginBottom: 4 }}>รูป QR พร้อมเพย์</div>
+                        <button
+                          onClick={() => qrInputRef.current.click()}
+                          style={{ background: 'none', border: '1px solid var(--color-primary)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'var(--font-main)' }}
+                        >
+                          {uploadingQr ? '⏳' : '🔄 เปลี่ยนรูป QR'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => qrInputRef.current.click()}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '6px 12px', borderRadius: 8,
+                        border: '1.5px dashed var(--color-primary)',
+                        background: 'var(--color-primary-light)',
+                        color: 'var(--color-primary)', fontSize: 12,
+                        cursor: 'pointer', fontFamily: 'var(--font-main)',
+                      }}
+                    >
+                      {uploadingQr ? '⏳ กำลังอัปโหลด...' : '📷 อัปโหลดรูป QR พร้อมเพย์'}
+                    </button>
+                  )}
+                  {qrErr && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>{qrErr}</div>}
+                  <input type="file" accept="image/*" ref={qrInputRef} style={{ display: 'none' }} onChange={handleQrChange} />
+                </div>
               </div>
             </div>
 
@@ -360,11 +483,33 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
               )}
             </div>
 
-            <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card" style={{ marginBottom: 12 }}>
               <div className="section-title" style={{ marginBottom: 12 }}>{t('seller.bank_info')}</div>
               <FormField label="ธนาคาร"    value={form.bank_name}           onChange={(v) => setForm((p) => ({ ...p, bank_name: v }))} />
               <FormField label="เลขบัญชี"  value={form.bank_account}        onChange={(v) => setForm((p) => ({ ...p, bank_account: v }))} />
               <FormField label="ชื่อบัญชี" value={form.bank_account_name}   onChange={(v) => setForm((p) => ({ ...p, bank_account_name: v }))} />
+            </div>
+
+            <div className="card" style={{ marginBottom: 20 }}>
+              <div className="section-title" style={{ marginBottom: 12 }}>💳 การรับชำระเงิน</div>
+              <FormField
+                label="ค่าธรรมเนียม COD (฿)"
+                type="number"
+                value={form.cod_fee}
+                onChange={(v) => setForm((p) => ({ ...p, cod_fee: v }))}
+              />
+              <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: -8, marginBottom: 12 }}>
+                ค่าธรรมเนียมที่เพิ่มเมื่อลูกค้าเลือกจ่ายปลายทาง (0 = ไม่มีค่าธรรมเนียม)
+              </div>
+              <FormField
+                label="เบอร์พร้อมเพย์"
+                type="tel"
+                value={form.promptpay_number}
+                onChange={(v) => setForm((p) => ({ ...p, promptpay_number: v }))}
+              />
+              <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: -8 }}>
+                รูป QR พร้อมเพย์: อัปโหลดได้ที่หน้าโปรไฟล์หลังบันทึก
+              </div>
             </div>
 
             {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
@@ -386,6 +531,14 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
         <ImageViewer
           src={toImgUrl(p.profile_image_path)}
           onClose={() => setShowImageViewer(false)}
+        />
+      )}
+
+      {/* QR viewer modal */}
+      {showQrViewer && p.promptpay_qr_image && (
+        <QrViewer
+          src={toImgUrl(p.promptpay_qr_image)}
+          onClose={() => setShowQrViewer(false)}
         />
       )}
     </div>

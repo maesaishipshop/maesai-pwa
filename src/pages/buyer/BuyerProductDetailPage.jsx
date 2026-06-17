@@ -332,12 +332,19 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
   const [loading, setLoading]         = useState(true);
   const [qty, setQty]                 = useState(1);
   const [ordering, setOrdering]       = useState(false);
-  const [chatLoading, setChatLoading] = useState(false); // loading state สำหรับปุ่มแชท
+  const [chatLoading, setChatLoading] = useState(false);
   const [error, setError]             = useState('');
   const [showOrder, setShowOrder]     = useState(false);
   const [note, setNote]               = useState('');
-  const [addressRequired, setAddressRequired] = useState(false); // banner ยังไม่มีที่อยู่
-  const [videoPoster, setVideoPoster] = useState(null); // thumbnail ของวิดีโอ
+  const [addressRequired, setAddressRequired] = useState(false);
+  const [videoPoster, setVideoPoster] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('cod'); // 'cod' | 'promptpay' | 'bank_transfer'
+  const [sellerPayment, setSellerPayment] = useState(null); // ข้อมูล payment ของ seller
+  const [showPaymentModal, setShowPaymentModal] = useState(false); // modal ข้อมูลการโอน
+  const [slipFile, setSlipFile]       = useState(null); // ไฟล์สลิปที่เลือก
+  const [slipPreview, setSlipPreview] = useState(null); // preview URL
+  const [uploadingSlip, setUploadingSlip] = useState(false);
+  const slipInputRef                  = useRef(null);
 
   /* ── Load product ────────────────────────────── */
   useEffect(() => {
@@ -359,6 +366,24 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
     getVideoThumbnail(videoUrl).then(setVideoPoster);
   }, [product?.video_path]);
 
+  /* ── ดึงข้อมูล payment ของ seller (เฉพาะเมื่อมี seller_id) ── */
+  useEffect(() => {
+    if (!product?.seller_id) return;
+    buyerApi.get(`/sellers/${product.seller_id}/public`)
+      .then((r) => {
+        const s = r.data.seller;
+        setSellerPayment({
+          cod_fee:            s.cod_fee           || 0,
+          promptpay_number:   s.promptpay_number  || null,
+          promptpay_qr_image: s.promptpay_qr_image|| null,
+          bank_name:          s.bank_name         || null,
+          bank_account:       s.bank_account      || null,
+          bank_account_name:  s.bank_account_name || null,
+        });
+      })
+      .catch(() => {});
+  }, [product?.seller_id]);
+
   /* ── Place order ─────────────────────────────── */
   async function handleOrder() {
     if (!product) return;
@@ -375,19 +400,28 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
     setError('');
     setOrdering(true);
     const payload = {
-      seller_id: product.seller_id,
-      items: [{ product_id: product.id, quantity: qty }],
-      note: note.trim() || undefined,
+      seller_id:      product.seller_id,
+      items:          [{ product_id: product.id, quantity: qty }],
+      note:           note.trim() || undefined,
+      payment_method: paymentMethod,
     };
     try {
       const res = await buyerApi.post('/orders', payload);
       const orderId = res.data.order?.id || res.data.data?.id || res.data.id;
       setShowOrder(false);
-      if (onOrderPlaced) onOrderPlaced(orderId);
+      setSlipFile(null);
+      setSlipPreview(null);
+      if (paymentMethod !== 'cod') {
+        // เปิด modal ให้อัปโหลดสลิปทันทีหลัง order สร้างสำเร็จ
+        setShowPaymentModal(false); // ปิด modal เดิมก่อน
+        if (onOrderPlaced) onOrderPlaced(orderId);
+      } else {
+        if (onOrderPlaced) onOrderPlaced(orderId);
+      }
     } catch (err) {
       const errorCode = err.response?.data?.error || err.response?.data?.message;
       if (errorCode === 'DELIVERY_ADDRESS_REQUIRED') {
-        setAddressRequired(true); // แสดง inline banner แทน error text
+        setAddressRequired(true);
         setError('');
       } else {
         setAddressRequired(false);
@@ -396,6 +430,14 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
     } finally {
       setOrdering(false);
     }
+  }
+
+  /* ── Slip file picker ────────────────────────── */
+  function handleSlipChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSlipFile(file);
+    setSlipPreview(URL.createObjectURL(file));
   }
 
   /* ── Loading ─────────────────────────────────── */
@@ -606,6 +648,7 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
             background: 'white', borderTop: '1px solid var(--color-border)',
             padding: 16, boxSizing: 'border-box',
             boxShadow: '0 -4px 16px rgba(0,0,0,0.12)', zIndex: 600,
+            maxHeight: '85vh', overflowY: 'auto',
           }}
         >
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>📦 สั่งซื้อ</div>
@@ -643,18 +686,91 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
             }}
           />
 
+          {/* Payment method selector */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>💳 วิธีชำระเงิน</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* COD */}
+              <label
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', borderRadius: 10,
+                  border: paymentMethod === 'cod' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  background: paymentMethod === 'cod' ? 'var(--color-primary-light)' : 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                <input type="radio" name="payment" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} style={{ accentColor: 'var(--color-primary)' }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>💵 เก็บเงินปลายทาง (COD)</div>
+                  {sellerPayment?.cod_fee > 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--color-text-sub)' }}>
+                      + ค่าธรรมเนียม ฿{Number(sellerPayment.cod_fee).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {/* PromptPay — แสดงเฉพาะมีเบอร์หรือ QR */}
+              {(sellerPayment?.promptpay_number || sellerPayment?.promptpay_qr_image) && (
+                <label
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 12px', borderRadius: 10,
+                    border: paymentMethod === 'promptpay' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    background: paymentMethod === 'promptpay' ? 'var(--color-primary-light)' : 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input type="radio" name="payment" value="promptpay" checked={paymentMethod === 'promptpay'} onChange={() => setPaymentMethod('promptpay')} style={{ accentColor: 'var(--color-primary)' }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>📱 พร้อมเพย์</div>
+                    {sellerPayment?.promptpay_number && (
+                      <div style={{ fontSize: 11, color: 'var(--color-text-sub)' }}>{sellerPayment.promptpay_number}</div>
+                    )}
+                  </div>
+                </label>
+              )}
+
+              {/* Bank transfer — แสดงเฉพาะมีข้อมูลธนาคาร */}
+              {sellerPayment?.bank_name && sellerPayment?.bank_account && (
+                <label
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 12px', borderRadius: 10,
+                    border: paymentMethod === 'bank_transfer' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    background: paymentMethod === 'bank_transfer' ? 'var(--color-primary-light)' : 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input type="radio" name="payment" value="bank_transfer" checked={paymentMethod === 'bank_transfer'} onChange={() => setPaymentMethod('bank_transfer')} style={{ accentColor: 'var(--color-primary)' }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>🏦 โอนเงินผ่านธนาคาร</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-sub)' }}>{sellerPayment.bank_name} · {sellerPayment.bank_account}</div>
+                  </div>
+                </label>
+              )}
+            </div>
+          </div>
+
           {/* Total estimate */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 14 }}>
             <span style={{ color: 'var(--color-text-sub)' }}>ยอดสินค้า</span>
             <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
               ฿{(qty * Number(product.price)).toLocaleString()}
             </span>
           </div>
+          {paymentMethod === 'cod' && sellerPayment?.cod_fee > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
+              <span style={{ color: 'var(--color-text-sub)' }}>ค่าธรรมเนียม COD</span>
+              <span style={{ color: 'var(--color-text-sub)' }}>฿{Number(sellerPayment.cod_fee).toLocaleString()}</span>
+            </div>
+          )}
           <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginBottom: 10 }}>
-            * ค่าขนส่งร้านค้ากำหนด — จ่ายปลายทาง
+            * ค่าขนส่งร้านค้ากำหนด — จ่ายตอนส่งมอบสินค้า
           </div>
 
-          {/* Banner: ยังไม่มีที่อยู่จัดส่ง — แตะเพื่อไปหน้า Profile */}
+          {/* Banner: ยังไม่มีที่อยู่จัดส่ง */}
           {addressRequired && (
             <div
               onClick={() => {
@@ -680,23 +796,134 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
 
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={() => setShowOrder(false)}
+              onClick={() => { setShowOrder(false); setPaymentMethod('cod'); }}
               className="btn-secondary"
               style={{ flex: 1 }}
             >
               {t('common.cancel')}
             </button>
-            <button
-              onClick={handleOrder}
-              disabled={ordering || stock === 0}
-              className="btn-primary"
-              style={{ flex: 2 }}
-            >
-              {ordering ? t('common.loading') + '…' : '✅ ' + t('buyer.place_order')}
-            </button>
+            {paymentMethod !== 'cod' ? (
+              <button
+                onClick={() => { setError(''); setShowPaymentModal(true); }}
+                disabled={stock === 0}
+                className="btn-primary"
+                style={{ flex: 2 }}
+              >
+                📋 ดูข้อมูลการโอน
+              </button>
+            ) : (
+              <button
+                onClick={handleOrder}
+                disabled={ordering || stock === 0}
+                className="btn-primary"
+                style={{ flex: 2 }}
+              >
+                {ordering ? t('common.loading') + '…' : '✅ ' + t('buyer.place_order')}
+              </button>
+            )}
           </div>
         </div>
       )}
+
+      {/* Payment info modal (แสดงข้อมูลการโอน + slip upload) */}
+      {showPaymentModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 700,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+          onClick={() => setShowPaymentModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 480,
+              background: 'white', borderRadius: '16px 16px 0 0',
+              padding: 20, boxSizing: 'border-box',
+              maxHeight: '90vh', overflowY: 'auto',
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>
+              {paymentMethod === 'promptpay' ? '📱 ข้อมูลพร้อมเพย์' : '🏦 ข้อมูลบัญชีธนาคาร'}
+            </div>
+
+            {/* PromptPay info */}
+            {paymentMethod === 'promptpay' && sellerPayment && (
+              <div style={{ marginBottom: 16 }}>
+                {sellerPayment.promptpay_number && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginBottom: 2 }}>เบอร์พร้อมเพย์</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primary)' }}>{sellerPayment.promptpay_number}</div>
+                  </div>
+                )}
+                {sellerPayment.promptpay_qr_image && (
+                  <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                    <img
+                      src={toImgUrl(sellerPayment.promptpay_qr_image)}
+                      alt="QR PromptPay"
+                      style={{ width: 200, height: 200, objectFit: 'contain', border: '1px solid var(--color-border)', borderRadius: 8 }}
+                    />
+                    <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 4 }}>สแกน QR เพื่อโอนเงิน</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bank transfer info */}
+            {paymentMethod === 'bank_transfer' && sellerPayment && (
+              <div
+                style={{ background: 'var(--color-bg)', borderRadius: 10, padding: 14, marginBottom: 16 }}
+              >
+                <div style={{ fontSize: 13, color: 'var(--color-text-sub)', marginBottom: 4 }}>ธนาคาร</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{sellerPayment.bank_name || '—'}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-sub)', marginBottom: 4 }}>เลขบัญชี</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primary)', letterSpacing: 1, marginBottom: 8 }}>{sellerPayment.bank_account || '—'}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-sub)', marginBottom: 4 }}>ชื่อบัญชี</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{sellerPayment.bank_account_name || '—'}</div>
+              </div>
+            )}
+
+            {/* ยอดที่ต้องโอน */}
+            <div
+              style={{
+                background: '#e8f5ef', borderRadius: 10, padding: 12, marginBottom: 16,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}
+            >
+              <span style={{ fontSize: 13, color: 'var(--color-primary-dark)' }}>ยอดที่ต้องโอน (ค่าสินค้า)</span>
+              <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-primary)' }}>
+                ฿{(qty * Number(product.price)).toLocaleString()}
+              </span>
+            </div>
+
+            <div style={{ fontSize: 12, color: 'var(--color-text-hint)', marginBottom: 16 }}>
+              * อัปโหลดสลิปการโอนหลังจากสั่งซื้อสำเร็จ ใน หน้าคำสั่งซื้อ → รายละเอียด Order
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="btn-secondary"
+                style={{ flex: 1 }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => { setShowPaymentModal(false); handleOrder(); }}
+                disabled={ordering || stock === 0}
+                className="btn-primary"
+                style={{ flex: 2 }}
+              >
+                {ordering ? t('common.loading') + '…' : '✅ ยืนยันสั่งซื้อ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* hidden slip file input */}
+      <input type="file" accept="image/*" ref={slipInputRef} style={{ display: 'none' }} onChange={handleSlipChange} />
 
       {/* Sticky buy button */}
       {!showOrder && (
