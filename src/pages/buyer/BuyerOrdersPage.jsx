@@ -27,7 +27,7 @@ const STATUS_BADGE = {
   disputed:         'badge-danger',
 };
 
-function OrderCard({ order, onSelect }) {
+function OrderCard({ order, onSelect, onDelete }) {
   const { t } = useTranslation();
   const status = order.status;
   const total  = Number(order.total || 0);
@@ -95,6 +95,23 @@ function OrderCard({ order, onSelect }) {
           📬 สินค้าถึงแล้ว — กดเพื่อยืนยันรับสินค้า
         </div>
       )}
+
+      {/* ปุ่มลบ — แสดงเฉพาะ cancelled */}
+      {status === 'cancelled' && onDelete && (
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(order.id); }}
+            style={{
+              padding: '5px 14px', borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-danger)', background: 'white',
+              color: 'var(--color-danger)', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'var(--font-main)',
+            }}
+          >
+            🗑 ลบ
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -104,6 +121,16 @@ export default function BuyerOrdersPage({ onSelectOrder, onPendingCountChange })
   const [orders, setOrders]       = useState([]);
   const [activeStatus, setStatus] = useState('');
   const [loading, setLoading]     = useState(true);
+
+  async function handleDelete(orderId) {
+    if (!window.confirm('ลบ order ที่ยกเลิกนี้ออกจากรายการ?')) return;
+    try {
+      await buyerApi.delete(`/orders/${orderId}`);
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    } catch (err) {
+      alert(err.response?.data?.error || 'ลบไม่สำเร็จ กรุณาลองใหม่');
+    }
+  }
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -181,6 +208,7 @@ export default function BuyerOrdersPage({ onSelectOrder, onPendingCountChange })
               key={order.id}
               order={order}
               onSelect={onSelectOrder}
+              onDelete={handleDelete}
             />
           ))
         )}
