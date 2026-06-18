@@ -341,10 +341,6 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
   const [paymentMethod, setPaymentMethod] = useState('cod'); // 'cod' | 'promptpay' | 'bank_transfer'
   const [sellerPayment, setSellerPayment] = useState(null); // ข้อมูล payment ของ seller
   const [showPaymentModal, setShowPaymentModal] = useState(false); // modal ข้อมูลการโอน
-  const [slipFile, setSlipFile]       = useState(null); // ไฟล์สลิปที่เลือก
-  const [slipPreview, setSlipPreview] = useState(null); // preview URL
-  const [uploadingSlip, setUploadingSlip] = useState(false);
-  const slipInputRef                  = useRef(null);
 
   /* ── Load product ────────────────────────────── */
   useEffect(() => {
@@ -433,13 +429,6 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
   }
 
   /* ── Slip file picker ────────────────────────── */
-  function handleSlipChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setSlipFile(file);
-    setSlipPreview(URL.createObjectURL(file));
-  }
-
   /* ── Loading ─────────────────────────────────── */
   if (loading) {
     return (
@@ -921,9 +910,6 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
           </div>
         </div>
       )}
-
-      {/* hidden slip file input */}
-      <input type="file" accept="image/*" ref={slipInputRef} style={{ display: 'none' }} onChange={handleSlipChange} />
 
       {/* Sticky buy button */}
       {!showOrder && (

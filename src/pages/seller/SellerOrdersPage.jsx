@@ -1,6 +1,6 @@
 // src/pages/seller/SellerOrdersPage.jsx
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi from '../../api/seller.api';
 import { toImgUrl } from '../../utils/imageUrl';
