@@ -344,27 +344,9 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
               )}
             </div>
 
-            {/* บัญชีธนาคาร — clickable */}
-            <div
-              className="card"
-              style={{ marginBottom: 12, cursor: 'pointer' }}
-              onClick={startEdit}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <div className="section-title" style={{ margin: 0 }}>{t('seller.bank_info')}</div>
-                <span style={{ fontSize: 12, color: 'var(--color-primary)' }}>✏️ แก้ไข</span>
-              </div>
-              <InfoRow label="ธนาคาร"   value={p.bank_name}         editable />
-              <InfoRow label="เลขบัญชี" value={p.bank_account} editable />
-              <InfoRow label="ชื่อบัญชี" value={p.bank_account_name} editable />
-              <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 10, textAlign: 'center' }}>
-                แตะเพื่อแก้ไขข้อมูล
-              </div>
-            </div>
-
-            {/* การชำระเงิน */}
+            {/* การชำระเงิน — รวม COD / พร้อมเพย์ / โอนธนาคาร */}
             <div className="card" style={{ marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div className="section-title" style={{ margin: 0 }}>💳 การรับชำระเงิน</div>
                 <button
                   onClick={startEdit}
@@ -375,60 +357,64 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
               </div>
 
               {/* COD fee */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--color-text-sub)' }}>💵 เก็บเงินปลายทาง (COD)</span>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>
+              <div style={{ paddingBottom: 10, borderBottom: '1px solid var(--color-border)', marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginBottom: 4 }}>💵 เก็บเงินปลายทาง (COD)</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
                   {p.cod_fee > 0 ? `ค่าธรรมเนียม ฿${Number(p.cod_fee).toLocaleString()}` : 'ไม่มีค่าธรรมเนียม'}
-                </span>
+                </div>
               </div>
 
               {/* PromptPay */}
-              <div style={{ marginTop: 8 }}>
+              <div style={{ paddingBottom: 10, borderBottom: '1px solid var(--color-border)', marginBottom: 10 }}>
                 <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginBottom: 4 }}>📱 พร้อมเพย์</div>
                 {p.promptpay_number ? (
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{p.promptpay_number}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{p.promptpay_number}</div>
                 ) : (
-                  <div style={{ fontSize: 12, color: 'var(--color-text-hint)' }}>ยังไม่ได้ตั้งค่า</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-hint)', marginBottom: 6 }}>ยังไม่ได้ตั้งค่า</div>
                 )}
-
-                {/* QR image */}
-                <div style={{ marginTop: 8 }}>
-                  {p.promptpay_qr_image ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <img
-                        src={toImgUrl(p.promptpay_qr_image)}
-                        alt="QR PromptPay"
-                        onClick={() => setShowQrViewer(true)}
-                        style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--color-border)', cursor: 'zoom-in' }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginBottom: 4 }}>รูป QR พร้อมเพย์</div>
-                        <button
-                          onClick={() => qrInputRef.current.click()}
-                          style={{ background: 'none', border: '1px solid var(--color-primary)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'var(--font-main)' }}
-                        >
-                          {uploadingQr ? '⏳' : '🔄 เปลี่ยนรูป QR'}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
+                {p.promptpay_qr_image ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <img
+                      src={toImgUrl(p.promptpay_qr_image)}
+                      alt="QR PromptPay"
+                      onClick={() => setShowQrViewer(true)}
+                      style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--color-border)', cursor: 'zoom-in' }}
+                    />
                     <button
                       onClick={() => qrInputRef.current.click()}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '6px 12px', borderRadius: 8,
-                        border: '1.5px dashed var(--color-primary)',
-                        background: 'var(--color-primary-light)',
-                        color: 'var(--color-primary)', fontSize: 12,
-                        cursor: 'pointer', fontFamily: 'var(--font-main)',
-                      }}
+                      style={{ background: 'none', border: '1px solid var(--color-primary)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'var(--font-main)' }}
                     >
-                      {uploadingQr ? '⏳ กำลังอัปโหลด...' : '📷 อัปโหลดรูป QR พร้อมเพย์'}
+                      {uploadingQr ? '⏳' : '🔄 เปลี่ยนรูป QR'}
                     </button>
-                  )}
-                  {qrErr && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>{qrErr}</div>}
-                  <input type="file" accept="image/*" ref={qrInputRef} style={{ display: 'none' }} onChange={handleQrChange} />
-                </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => qrInputRef.current.click()}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '5px 10px', borderRadius: 8,
+                      border: '1.5px dashed var(--color-primary)',
+                      background: 'var(--color-primary-light)',
+                      color: 'var(--color-primary)', fontSize: 12,
+                      cursor: 'pointer', fontFamily: 'var(--font-main)',
+                    }}
+                  >
+                    {uploadingQr ? '⏳ กำลังอัปโหลด...' : '📷 อัปโหลดรูป QR พร้อมเพย์'}
+                  </button>
+                )}
+                {qrErr && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>{qrErr}</div>}
+                <input type="file" accept="image/*" ref={qrInputRef} style={{ display: 'none' }} onChange={handleQrChange} />
+              </div>
+
+              {/* โอนธนาคาร */}
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-sub)', marginBottom: 6 }}>🏦 โอนธนาคาร</div>
+                <InfoRow label="ธนาคาร"    value={p.bank_name} />
+                <InfoRow label="เลขบัญชี"  value={p.bank_account} />
+                <InfoRow label="ชื่อบัญชี" value={p.bank_account_name} />
+                {!p.bank_name && !p.bank_account && (
+                  <div style={{ fontSize: 12, color: 'var(--color-text-hint)' }}>ยังไม่ได้ตั้งค่า</div>
+                )}
               </div>
             </div>
 
@@ -483,32 +469,41 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
               )}
             </div>
 
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div className="section-title" style={{ marginBottom: 12 }}>{t('seller.bank_info')}</div>
-              <FormField label="ธนาคาร"    value={form.bank_name}           onChange={(v) => setForm((p) => ({ ...p, bank_name: v }))} />
-              <FormField label="เลขบัญชี"  value={form.bank_account}        onChange={(v) => setForm((p) => ({ ...p, bank_account: v }))} />
-              <FormField label="ชื่อบัญชี" value={form.bank_account_name}   onChange={(v) => setForm((p) => ({ ...p, bank_account_name: v }))} />
-            </div>
-
             <div className="card" style={{ marginBottom: 20 }}>
               <div className="section-title" style={{ marginBottom: 12 }}>💳 การรับชำระเงิน</div>
+
+              {/* COD */}
+              <div style={{ marginBottom: 4, fontSize: 12, color: 'var(--color-text-sub)', fontWeight: 600 }}>💵 เก็บเงินปลายทาง (COD)</div>
               <FormField
                 label="ค่าธรรมเนียม COD (฿)"
                 type="number"
                 value={form.cod_fee}
                 onChange={(v) => setForm((p) => ({ ...p, cod_fee: v }))}
               />
-              <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: -8, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: -8, marginBottom: 16 }}>
                 ค่าธรรมเนียมที่เพิ่มเมื่อลูกค้าเลือกจ่ายปลายทาง (0 = ไม่มีค่าธรรมเนียม)
               </div>
-              <FormField
-                label="เบอร์พร้อมเพย์"
-                type="tel"
-                value={form.promptpay_number}
-                onChange={(v) => setForm((p) => ({ ...p, promptpay_number: v }))}
-              />
-              <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: -8 }}>
-                รูป QR พร้อมเพย์: อัปโหลดได้ที่หน้าโปรไฟล์หลังบันทึก
+
+              {/* PromptPay */}
+              <div style={{ paddingTop: 4, borderTop: '1px solid var(--color-border)', marginBottom: 4 }}>
+                <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--color-text-sub)', fontWeight: 600 }}>📱 พร้อมเพย์</div>
+                <FormField
+                  label="เบอร์พร้อมเพย์"
+                  type="tel"
+                  value={form.promptpay_number}
+                  onChange={(v) => setForm((p) => ({ ...p, promptpay_number: v }))}
+                />
+                <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: -8, marginBottom: 8 }}>
+                  รูป QR พร้อมเพย์: อัปโหลดได้ที่หน้าโปรไฟล์หลังบันทึก
+                </div>
+              </div>
+
+              {/* โอนธนาคาร */}
+              <div style={{ paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
+                <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--color-text-sub)', fontWeight: 600 }}>🏦 โอนธนาคาร</div>
+                <FormField label="ธนาคาร"    value={form.bank_name}           onChange={(v) => setForm((p) => ({ ...p, bank_name: v }))} />
+                <FormField label="เลขบัญชี"  value={form.bank_account}        onChange={(v) => setForm((p) => ({ ...p, bank_account: v }))} />
+                <FormField label="ชื่อบัญชี" value={form.bank_account_name}   onChange={(v) => setForm((p) => ({ ...p, bank_account_name: v }))} />
               </div>
             </div>
 
