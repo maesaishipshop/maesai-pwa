@@ -405,8 +405,6 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
       const res = await buyerApi.post('/orders', payload);
       const orderId = res.data.order?.id || res.data.data?.id || res.data.id;
       setShowOrder(false);
-      setSlipFile(null);
-      setSlipPreview(null);
       if (paymentMethod !== 'cod') {
         // เปิด modal ให้อัปโหลดสลิปทันทีหลัง order สร้างสำเร็จ
         setShowPaymentModal(false); // ปิด modal เดิมก่อน
