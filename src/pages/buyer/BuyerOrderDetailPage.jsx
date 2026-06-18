@@ -204,7 +204,6 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onToast }) {
   const [showReview, setShowReview]= useState(false);
   const [reviewed, setReviewed]    = useState(false);
   const [uploadingSlip, setUploadingSlip] = useState(false);
-  const [slipPreview, setSlipPreview]     = useState(null);
   const [showSlipViewer, setShowSlipViewer] = useState(false);
   const slipInputRef = useRef(null);
 
@@ -216,7 +215,6 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onToast }) {
       const fd = new FormData();
       fd.append('slip', file);
       await buyerApi.post(`/orders/${orderId}/payment-slip`, fd);
-      setSlipPreview(null);
       if (onToast) onToast('✅ ส่งสลิปสำเร็จ รอ Seller ยืนยัน');
       loadOrder(); // reload เพื่อแสดง slip ล่าสุด
     } catch (err) {
