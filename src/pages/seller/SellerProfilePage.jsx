@@ -501,7 +501,7 @@ export default function SellerProfilePage({ profile, onProfileUpdated }) {
               {/* โอนธนาคาร */}
               <div style={{ paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
                 <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--color-text-sub)', fontWeight: 600 }}>🏦 โอนธนาคาร</div>
-                <FormField label="ธนาคาร"    value={form.bank_name}           onChange={(v) => setForm((p) => ({ ...p, bank_name: v }))} />
+                <BankSelect value={form.bank_name} onChange={(v) => setForm((p) => ({ ...p, bank_name: v }))} />
                 <FormField label="เลขบัญชี"  value={form.bank_account}        onChange={(v) => setForm((p) => ({ ...p, bank_account: v }))} />
                 <FormField label="ชื่อบัญชี" value={form.bank_account_name}   onChange={(v) => setForm((p) => ({ ...p, bank_account_name: v }))} />
               </div>
@@ -587,6 +587,59 @@ function InfoRow({ label, value, editable }) {
         <span style={{ fontSize: 13, color: 'var(--color-text-main)', flex: 1 }}>{value}</span>
         {editable && <span style={{ fontSize: 10, color: 'var(--color-text-hint)', flexShrink: 0 }}>✏️</span>}
       </div>
+    </div>
+  );
+}
+
+const THAI_BANKS = [
+  'ธนาคารกสิกรไทย (KBank)',
+  'ธนาคารไทยพาณิชย์ (SCB)',
+  'ธนาคารกรุงเทพ (BBL)',
+  'ธนาคารกรุงไทย (KTB)',
+  'ธนาคารกรุงศรีอยุธยา (BAY)',
+  'ธนาคารทหารไทยธนชาต (TTB)',
+  'ธนาคารออมสิน (GSB)',
+  'ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร (BAAC)',
+  'ธนาคารยูโอบี (UOB)',
+  'ธนาคารซีไอเอ็มบีไทย (CIMB)',
+];
+
+function BankSelect({ value, onChange }) {
+  const [showCustom, setShowCustom] = useState(!!value && !THAI_BANKS.includes(value));
+
+  function handleSelect(e) {
+    if (e.target.value === '__other__') {
+      setShowCustom(true);
+      onChange('');
+    } else {
+      setShowCustom(false);
+      onChange(e.target.value);
+    }
+  }
+
+  return (
+    <div className="form-group">
+      <label className="form-label">ธนาคาร</label>
+      <select
+        className="input-field"
+        value={showCustom ? '__other__' : (value || '')}
+        onChange={handleSelect}
+        style={{ WebkitAppearance: 'auto', appearance: 'auto' }}
+      >
+        <option value="">-- เลือกธนาคาร --</option>
+        {THAI_BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+        <option value="__other__">อื่นๆ (พิมพ์เอง)</option>
+      </select>
+      {showCustom && (
+        <input
+          className="input-field"
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="ระบุชื่อธนาคาร"
+          style={{ marginTop: 6 }}
+        />
+      )}
     </div>
   );
 }
