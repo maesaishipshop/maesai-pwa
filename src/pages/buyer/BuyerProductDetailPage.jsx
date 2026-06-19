@@ -341,6 +341,7 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
   const [paymentMethod, setPaymentMethod] = useState('cod'); // 'cod' | 'promptpay' | 'bank_transfer'
   const [sellerPayment, setSellerPayment] = useState(null); // ข้อมูล payment ของ seller
   const [showPaymentModal, setShowPaymentModal] = useState(false); // modal ข้อมูลการโอน
+  const [bankCopied, setBankCopied]             = useState(false); // feedback หลัง copy เลขบัญชี
 
   /* ── Load product ────────────────────────────── */
   useEffect(() => {
@@ -852,6 +853,18 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
                       style={{ width: 200, height: 200, objectFit: 'contain', border: '1px solid var(--color-border)', borderRadius: 8 }}
                     />
                     <div style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 4 }}>สแกน QR เพื่อโอนเงิน</div>
+                    {/* เปิดรูปในแท็บใหม่ → iOS long-press save / desktop right-click save */}
+                    <button
+                      onClick={() => window.open(toImgUrl(sellerPayment.promptpay_qr_image), '_blank', 'noopener,noreferrer')}
+                      style={{
+                        marginTop: 8, padding: '6px 16px', borderRadius: 8,
+                        border: '1px solid var(--color-border)', background: 'white',
+                        color: 'var(--color-text-sub)', fontSize: 12,
+                        cursor: 'pointer', fontFamily: 'var(--font-main)',
+                      }}
+                    >
+                      💾 บันทึกรูป QR
+                    </button>
                   </div>
                 )}
               </div>
@@ -865,7 +878,34 @@ export default function BuyerProductDetailPage({ productId, onBack, onOrderPlace
                 <div style={{ fontSize: 13, color: 'var(--color-text-sub)', marginBottom: 4 }}>ธนาคาร</div>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{sellerPayment.bank_name || '—'}</div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-sub)', marginBottom: 4 }}>เลขบัญชี</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primary)', letterSpacing: 1, marginBottom: 8 }}>{sellerPayment.bank_account || '—'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-primary)', letterSpacing: 1 }}>
+                    {sellerPayment.bank_account || '—'}
+                  </div>
+                  {sellerPayment.bank_account && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(sellerPayment.bank_account);
+                          setBankCopied(true);
+                          setTimeout(() => setBankCopied(false), 2000);
+                        } catch {
+                          alert('คัดลอกไม่สำเร็จ กรุณาคัดลอกเอง');
+                        }
+                      }}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, flexShrink: 0,
+                        border: bankCopied ? 'none' : '1px solid var(--color-border)',
+                        background: bankCopied ? '#e8f5ef' : 'white',
+                        color: bankCopied ? 'var(--color-primary)' : 'var(--color-text-sub)',
+                        fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-main)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {bankCopied ? '✅ คัดลอกแล้ว' : '📋 คัดลอก'}
+                    </button>
+                  )}
+                </div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-sub)', marginBottom: 4 }}>ชื่อบัญชี</div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{sellerPayment.bank_account_name || '—'}</div>
               </div>
