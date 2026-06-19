@@ -2,12 +2,14 @@
 // Maesai Market — Seller Register
 // เพิ่ม email field (optional) — ส่ง email ไปใน body ถ้ากรอก
 // รองรับ EMAIL_ALREADY_REGISTERED จาก backend (migration 021)
+// Step 15-32: บังคับยอมรับ Terms of Service ก่อนสมัคร
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import sellerApi from '../../api/seller.api';
 import FormInput from '../../components/shared/FormInput';
 import BackButton from '../../components/shared/BackButton';
+import TermsModal from '../../components/shared/TermsModal';
 
 export default function SellerRegisterPage({ navigate }) {
   const { t } = useTranslation();
@@ -18,10 +20,11 @@ export default function SellerRegisterPage({ navigate }) {
     password: '',
     confirm_password: '',
   });
-  const [errors, setErrors]     = useState({});
-  const [apiError, setApiError] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [success, setSuccess]   = useState(false);
+  const [errors, setErrors]       = useState({});
+  const [apiError, setApiError]   = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [success, setSuccess]     = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   function setField(key, val) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -37,20 +40,24 @@ export default function SellerRegisterPage({ navigate }) {
     return e;
   }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
     setApiError('');
     const e2 = validate();
     if (Object.keys(e2).length > 0) { setErrors(e2); return; }
+    setShowTerms(true);
+  }
 
+  async function handleRegister() {
+    setShowTerms(false);
     setLoading(true);
     try {
       const payload = {
-        shop_name: form.shop_name.trim(),
-        phone:     form.phone.trim(),
-        password:  form.password,
+        shop_name:      form.shop_name.trim(),
+        phone:          form.phone.trim(),
+        password:       form.password,
+        terms_accepted: true,
       };
-      // เพิ่ม email เฉพาะเมื่อกรอก (optional)
       if (form.email.trim()) payload.email = form.email.trim();
 
       await sellerApi.post('/auth/seller/register', payload);
@@ -99,6 +106,14 @@ export default function SellerRegisterPage({ navigate }) {
 
   return (
     <div className="page-container">
+      {showTerms && (
+        <TermsModal
+          role="seller"
+          onAccept={handleRegister}
+          onClose={() => setShowTerms(false)}
+        />
+      )}
+
       <div className="top-bar">
         <BackButton onClick={() => navigate('seller-login')} />
         <span className="top-bar-title">{t('auth.register')} — {t('landing.seller')}</span>

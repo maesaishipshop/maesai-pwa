@@ -4,12 +4,14 @@
 //   ดู auth.buyer.controller.js: const { phone, password, name } = req.body
 // เพิ่ม email field (optional) — ส่ง email ไปใน body ถ้ากรอก
 // รองรับ EMAIL_ALREADY_REGISTERED จาก backend (migration 021)
+// Step 15-32: บังคับยอมรับ Terms of Service ก่อนสมัคร
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import buyerApi from '../../api/buyer.api';
 import FormInput from '../../components/shared/FormInput';
 import BackButton from '../../components/shared/BackButton';
+import TermsModal from '../../components/shared/TermsModal';
 
 export default function BuyerRegisterPage({ navigate }) {
   const { t } = useTranslation();
@@ -20,10 +22,11 @@ export default function BuyerRegisterPage({ navigate }) {
     password: '',
     confirm_password: '',
   });
-  const [errors, setErrors]     = useState({});
-  const [apiError, setApiError] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [success, setSuccess]   = useState(false);
+  const [errors, setErrors]         = useState({});
+  const [apiError, setApiError]     = useState('');
+  const [loading, setLoading]       = useState(false);
+  const [success, setSuccess]       = useState(false);
+  const [showTerms, setShowTerms]   = useState(false);
 
   function setField(key, val) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -39,20 +42,24 @@ export default function BuyerRegisterPage({ navigate }) {
     return e;
   }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
     setApiError('');
     const e2 = validate();
     if (Object.keys(e2).length > 0) { setErrors(e2); return; }
+    setShowTerms(true);
+  }
 
+  async function handleRegister() {
+    setShowTerms(false);
     setLoading(true);
     try {
       const payload = {
-        name:     form.name.trim(),
-        phone:    form.phone.trim(),
-        password: form.password,
+        name:           form.name.trim(),
+        phone:          form.phone.trim(),
+        password:       form.password,
+        terms_accepted: true,
       };
-      // เพิ่ม email เฉพาะเมื่อกรอก (optional)
       if (form.email.trim()) payload.email = form.email.trim();
 
       await buyerApi.post('/auth/buyer/register', payload);
@@ -101,6 +108,14 @@ export default function BuyerRegisterPage({ navigate }) {
 
   return (
     <div className="page-container">
+      {showTerms && (
+        <TermsModal
+          role="buyer"
+          onAccept={handleRegister}
+          onClose={() => setShowTerms(false)}
+        />
+      )}
+
       <div className="top-bar">
         <BackButton onClick={() => navigate('buyer-login')} />
         <span className="top-bar-title">{t('auth.register')} — {t('landing.buyer')}</span>

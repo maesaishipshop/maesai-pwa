@@ -2,12 +2,14 @@
 // Maesai Market — Driver Register
 // เพิ่ม email field (optional) — ส่ง email ไปใน body ถ้ากรอก
 // รองรับ EMAIL_ALREADY_REGISTERED จาก backend (migration 021)
+// Step 15-32: บังคับยอมรับ Terms of Service ก่อนสมัคร
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import driverApi from '../../api/driver.api';
 import FormInput from '../../components/shared/FormInput';
 import BackButton from '../../components/shared/BackButton';
+import TermsModal from '../../components/shared/TermsModal';
 
 const VEHICLE_TYPES = [
   { value: 'motorcycle', labelKey: 'auth.vehicle_motorcycle' },
@@ -28,10 +30,13 @@ export default function DriverRegisterPage({ navigate }) {
     password:         '',
     confirm_password: '',
   });
-  const [errors, setErrors]     = useState({});
-  const [apiError, setApiError] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [success, setSuccess]   = useState(false);
+  const [errors, setErrors]       = useState({});
+  const [apiError, setApiError]   = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [success, setSuccess]     = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  // เก็บ nameParts ไว้ใช้ตอน handleRegister
+  const [nameParts, setNameParts] = useState({ first_name: '', last_name: '' });
 
   function setField(key, val) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -54,28 +59,31 @@ export default function DriverRegisterPage({ navigate }) {
     return e;
   }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
     setApiError('');
     const e2 = validate();
     if (Object.keys(e2).length > 0) { setErrors(e2); return; }
 
-    const nameParts  = form.full_name.trim().split(' ');
-    const first_name = nameParts[0] || '';
-    const last_name  = nameParts.slice(1).join(' ') || '-';
+    const parts = form.full_name.trim().split(' ');
+    setNameParts({ first_name: parts[0] || '', last_name: parts.slice(1).join(' ') || '-' });
+    setShowTerms(true);
+  }
 
+  async function handleRegister() {
+    setShowTerms(false);
     setLoading(true);
     try {
       const payload = {
-        first_name,
-        last_name,
+        first_name:     nameParts.first_name,
+        last_name:      nameParts.last_name,
         phone:          form.phone.trim(),
         id_card_number: form.id_card_number.trim(),
         vehicle_type:   form.vehicle_type,
         vehicle_plate:  form.vehicle_plate.trim(),
         password:       form.password,
+        terms_accepted: true,
       };
-      // เพิ่ม email เฉพาะเมื่อกรอก (optional)
       if (form.email.trim()) payload.email = form.email.trim();
 
       await driverApi.post('/auth/driver/register', payload);
@@ -135,6 +143,14 @@ export default function DriverRegisterPage({ navigate }) {
 
   return (
     <div className="page-container">
+      {showTerms && (
+        <TermsModal
+          role="driver"
+          onAccept={handleRegister}
+          onClose={() => setShowTerms(false)}
+        />
+      )}
+
       <div className="top-bar">
         <BackButton onClick={() => navigate('driver-login')} />
         <span className="top-bar-title">{t('auth.register')} — {t('landing.driver')}</span>
